@@ -21,6 +21,7 @@ import type {
   CronRunOutcome,
   CronRunStatus,
   CronRunTelemetry,
+  CronRunTriggerSource,
 } from "../types.js";
 import type { CronServiceState } from "./state.js";
 
@@ -66,6 +67,8 @@ export type TimedCronRunOutcome = CronRunOutcome &
     scriptStateChanged?: boolean;
     scriptState?: unknown;
     nextCheck?: CronNextCheckProposal;
+    /** How this run was initiated; the ledger surfaces SCHEDULED vs MANUAL. */
+    trigger?: CronRunTriggerSource;
   };
 
 export type CronJobRunResult = CronRunOutcome &

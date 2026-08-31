@@ -32,4 +32,31 @@ describe("cronRunLogEntryFromEvent", () => {
 
     expect(entry).toMatchObject({ errorReason: "timeout", completionStatus: "failed" });
   });
+
+  it("defaults trigger to scheduled for legacy events without the field", () => {
+    const entry = cronRunLogEntryFromEvent(
+      {
+        jobId: "legacy-job",
+        action: "finished",
+        status: "ok",
+      },
+      1,
+    );
+
+    expect(entry.trigger).toBe("scheduled");
+  });
+
+  it("preserves explicit trigger field when present", () => {
+    const entry = cronRunLogEntryFromEvent(
+      {
+        jobId: "manual-job",
+        action: "finished",
+        status: "ok",
+        trigger: "manual",
+      },
+      1,
+    );
+
+    expect(entry.trigger).toBe("manual");
+  });
 });

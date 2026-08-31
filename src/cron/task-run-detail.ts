@@ -234,6 +234,7 @@ export function cronRunLogEntryToTaskDetail(
     durationMs: entry.durationMs,
     nextRunAtMs: entry.nextRunAtMs,
     triggerFired: entry.triggerFired,
+    trigger: entry.trigger,
     triggerStateChanged:
       options.triggerEval?.fired === true ? options.triggerEval.stateChanged : undefined,
     triggerState:
