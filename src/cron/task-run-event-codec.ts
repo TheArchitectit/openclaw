@@ -51,6 +51,7 @@ export function cronRunLogEntryFromEvent(
     durationMs: event.durationMs,
     nextRunAtMs: event.nextRunAtMs,
     triggerFired: event.triggerFired,
+    trigger: event.trigger ?? "scheduled", // legacy rows default to scheduled
     model: event.model,
     provider: event.provider,
     usage: event.usage,

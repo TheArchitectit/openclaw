@@ -228,6 +228,7 @@ function skipInvalidPersistedManualRun(params: {
       deliveryStatus: params.job.state.lastDeliveryStatus,
       deliveryError: params.job.state.lastDeliveryError,
       failureNotificationDelivery: failureNotificationDeliveryFromJobState(params.job),
+      trigger: "manual",
     },
     params.terminalTracker,
   );

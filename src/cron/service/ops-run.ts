@@ -231,6 +231,7 @@ async function finishPreparedManualRun(
           runAtMs: startedAt,
           durationMs: Math.max(0, endedAt - startedAt),
           nextRunAtMs: job?.state.nextRunAtMs,
+          trigger: "manual",
           model: coreResult.model,
           provider: coreResult.provider,
           usage: coreResult.usage,
@@ -294,6 +295,7 @@ async function finishPreparedManualRun(
           runReceipt: prepared.runReceipt,
           startedAt,
           endedAt,
+          trigger: "manual",
         });
       }
       let removedJob: CronJob | undefined;
@@ -388,6 +390,7 @@ async function finishPreparedManualRun(
               runAtMs: startedAt,
               durationMs: committed.job.state.lastDurationMs,
               nextRunAtMs: committed.job.state.nextRunAtMs,
+              trigger: "manual",
               ...(coreResult.triggerEval?.fired ? { triggerFired: true } : {}),
               model: coreResult.model,
               provider: coreResult.provider,
@@ -547,6 +550,7 @@ export async function enqueueRun(
                   runAtMs: finishedAt,
                   durationMs: 0,
                   nextRunAtMs: job?.state.nextRunAtMs,
+                  trigger: "manual",
                 },
                 terminalTracker,
               );
@@ -591,6 +595,7 @@ export async function enqueueRun(
         runAtMs: finishedAt,
         durationMs: 0,
         nextRunAtMs: job?.state.nextRunAtMs,
+        trigger: "manual",
       },
       terminalTracker,
     );
