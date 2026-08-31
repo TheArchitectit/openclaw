@@ -2701,5 +2701,79 @@ describe("cron service ops persist rollback", () => {
       computeSpy.mockRestore();
     }
   });
+
+  describe("trigger source on run log entries", () => {
+    it("sets trigger=manual on a completed manual run event", async () => {
+      const { storePath } = await makeStorePath();
+      const now = Date.parse("2026-03-23T12:00:00.000Z");
+
+      await withStateDirForStorePath(storePath, async () => {
+        await writeDueIsolatedJobSnapshot(storePath, now);
+        const events: CronEvent[] = [];
+        const state = createCronServiceState({
+          storePath,
+          cronEnabled: true,
+          log: logger,
+          nowMs: () => now,
+          enqueueSystemEvent: vi.fn(),
+          requestHeartbeat: vi.fn(),
+          runIsolatedAgentJob: vi.fn(async () => ({
+            status: "ok" as const,
+            summary: "manual ok",
+            provider: "openai",
+            model: "gpt-test",
+          })),
+          onEvent: (event) => events.push(structuredClone(event)),
+        });
+
+        await run(state, "isolated-timeout");
+
+        const finishedEvents = events.filter((e) => e.action === "finished");
+        expect(finishedEvents).toHaveLength(1);
+        expect(finishedEvents[0]).toMatchObject({
+          jobId: "isolated-timeout",
+          status: "ok",
+          trigger: "manual",
+        });
+      });
+    });
+
+    it("sets trigger=scheduled on a completed scheduled run event", async () => {
+      const { storePath } = await makeStorePath();
+      const now = Date.parse("2026-03-23T12:00:00.000Z");
+      const startedAt = now - 60_000;
+
+      await withStateDirForStorePath(storePath, async () => {
+        await writeDueIsolatedJobSnapshot(storePath, startedAt);
+        const events: CronEvent[] = [];
+        const state = createCronServiceState({
+          storePath,
+          cronEnabled: true,
+          log: logger,
+          nowMs: () => now,
+          enqueueSystemEvent: vi.fn(),
+          requestHeartbeat: vi.fn(),
+          runIsolatedAgentJob: vi.fn(async () => ({
+            status: "ok" as const,
+            summary: "scheduled ok",
+            provider: "openai",
+            model: "gpt-test",
+          })),
+          onEvent: (event) => events.push(structuredClone(event)),
+        });
+
+        // Advance past due — the scheduler fires it.
+        await runMissedJobs(state);
+
+        const finishedEvents = events.filter((e) => e.action === "finished");
+        expect(finishedEvents).toHaveLength(1);
+        expect(finishedEvents[0]).toMatchObject({
+          jobId: "isolated-timeout",
+          status: "ok",
+          trigger: "scheduled",
+        });
+      });
+    });
+  });
 });
 /* oxlint-disable max-lines -- TODO: split this grandfathered oversized file. */

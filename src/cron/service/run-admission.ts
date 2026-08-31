@@ -597,6 +597,7 @@ export async function executeQueuedCronRun(params: {
       reservationIdentity: params.reservationIdentity,
       startedAt: started.startedAt,
       runReceipt: started.runReceipt,
+      trigger: "scheduled" as const,
     };
     let outcome: TimedCronRunOutcome;
     try {

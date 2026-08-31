@@ -35,6 +35,7 @@ import type {
   CronRunOutcome,
   CronRunStatus,
   CronRunTelemetry,
+  CronRunTriggerSource,
   CronStoredJob,
   CronStoreFile,
   CronToolsAllowExecTarget,
@@ -65,6 +66,8 @@ export type CronEvent = {
   runId?: string;
   nextRunAtMs?: number;
   triggerFired?: boolean;
+  /** How this run was initiated; surfaced on the run ledger. */
+  trigger?: CronRunTriggerSource;
 } & CronRunTelemetry;
 
 /** Transient internal context delivered beside, but never projected into, a CronEvent. */
