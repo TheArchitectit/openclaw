@@ -1,0 +1,17 @@
+{
+  "adapters": {
+    "claude": {
+      "endpoint": "http://your-anthropic-compatible-endpoint.example:8080",
+      "apiKeyRef": "keys/claude.key",
+      "model": "your-default-model",
+      "slots": {
+        "haiku": "your-fast-model",
+        "sonnet": "your-default-model",
+        "opus": "your-heavy-model"
+      },
+      "env": {
+        "DISABLE_AUTOUPDATER": "1"
+      }
+    }
+  }
+}
