@@ -6564,6 +6564,11 @@ export const en: TranslationMap & {
       ascending: "Ascending",
       descending: "Descending",
       reset: "Reset",
+      kind: "Kind",
+    },
+    upcoming: {
+      title: "Upcoming",
+      eventJobs: "event-driven",
     },
     runs: {
       searchRuns: "Search runs",
