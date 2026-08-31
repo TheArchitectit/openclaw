@@ -33,7 +33,7 @@ describe("cronRunLogEntryFromEvent", () => {
     expect(entry).toMatchObject({ errorReason: "timeout", completionStatus: "failed" });
   });
 
-  it("defaults trigger to scheduled for legacy events without the field", () => {
+  it("leaves trigger undefined for legacy events without the field", () => {
     const entry = cronRunLogEntryFromEvent(
       {
         jobId: "legacy-job",
@@ -43,7 +43,7 @@ describe("cronRunLogEntryFromEvent", () => {
       1,
     );
 
-    expect(entry.trigger).toBe("scheduled");
+    expect(entry.trigger).toBeUndefined();
   });
 
   it("preserves explicit trigger field when present", () => {
@@ -59,4 +59,21 @@ describe("cronRunLogEntryFromEvent", () => {
 
     expect(entry.trigger).toBe("manual");
   });
+
+  it.each(["stream", "on-exit", "trigger-script"] as const)(
+    "preserves trigger=%s from the finished event",
+    (trigger) => {
+      const entry = cronRunLogEntryFromEvent(
+        {
+          jobId: `${trigger}-job`,
+          action: "finished",
+          status: "ok",
+          trigger,
+        },
+        1,
+      );
+
+      expect(entry.trigger).toBe(trigger);
+    },
+  );
 });
