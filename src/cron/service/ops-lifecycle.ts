@@ -42,7 +42,6 @@ function emitInterruptedRun(state: CronServiceState, interrupted: InterruptedSta
       runAtMs: interrupted.runAtMs,
       durationMs: interrupted.durationMs,
       nextRunAtMs: job?.state.nextRunAtMs,
-      trigger: "scheduled",
     },
     undefined,
     interrupted.taskRunId,
