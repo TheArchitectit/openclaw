@@ -69,6 +69,14 @@ const CronJobsTriggerFilterSchema = Type.Union([
   Type.Literal("conditional"),
   Type.Literal("unconditional"),
 ]);
+/** How a run was initiated; surfaced in the run ledger to distinguish SCHEDULED from MANUAL. */
+const CronRunTriggerSourceSchema = Type.Union([
+  Type.Literal("scheduled"),
+  Type.Literal("manual"),
+  Type.Literal("trigger-script"),
+  Type.Literal("on-exit"),
+  Type.Literal("stream"),
+]);
 const CronJobsSortBySchema = Type.Union([
   Type.Literal("nextRunAtMs"),
   Type.Literal("updatedAtMs"),
@@ -737,6 +745,7 @@ export const CronRunLogEntrySchema = closedObject({
   durationMs: Type.Optional(Type.Integer({ minimum: 0 })),
   nextRunAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
   triggerFired: Type.Optional(Type.Boolean()),
+  trigger: Type.Optional(CronRunTriggerSourceSchema),
   model: Type.Optional(Type.String()),
   provider: Type.Optional(Type.String()),
   usage: Type.Optional(

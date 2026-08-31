@@ -455,6 +455,34 @@ describe("cron protocol validators", () => {
     ]);
   });
 
+  it("accepts all valid trigger source values on run log entries", () => {
+    for (const trigger of ["scheduled", "manual", "trigger-script", "on-exit", "stream"] as const) {
+      expect(
+        Value.Check(CronRunLogEntrySchema, {
+          ts: 1,
+          jobId: "job-1",
+          action: "finished",
+          status: "ok",
+          trigger,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects invalid trigger source values on run log entries", () => {
+    for (const trigger of ["automatic", "command", "unknown", 123, null] as unknown[]) {
+      expect(
+        Value.Check(CronRunLogEntrySchema, {
+          ts: 1,
+          jobId: "job-1",
+          action: "finished",
+          status: "ok",
+          trigger,
+        }),
+      ).toBe(false);
+    }
+  });
+
   it("accepts runs paging/filter/sort params", () => {
     expectCases(validateCronRunsParams, true, [
       {
