@@ -15,6 +15,7 @@ and manual pre-PR checks; it is an example, not product code.
 """
 
 import argparse
+import os
 import re
 import stat
 import subprocess
@@ -88,9 +89,41 @@ def gitignored(root: Path, target: Path) -> bool:
     return out.returncode == 0
 
 
+def expand_paths(paths: list[Path]) -> list[Path]:
+    """Expand directories recursively into the files beneath them.
+
+    A supplied directory is walked (symlinks not followed, .git skipped) so
+    `--scan examples/` inspects the tree it names instead of reporting a
+    misleading zero-file success. A supplied path that does not exist is a
+    hard error: a typo'd path must not produce a green 0-scan result.
+    """
+    missing = [p for p in paths if not p.exists()]
+    if missing:
+        fail("no such path (nothing was scanned): " + ", ".join(str(m) for m in missing))
+    files: list[Path] = []
+    for path in paths:
+        if path.is_dir() and not path.is_symlink():
+            for root, dirs, names in os.walk(path):
+                dirs[:] = [d for d in dirs if d != ".git"]
+                for name in names:
+                    files.append(Path(root) / name)
+        else:
+            files.append(path)
+    # De-duplicate while preserving order.
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for path in files:
+        resolved = path.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            unique.append(path)
+    return unique
+
+
 def scan(paths: list[Path], repo_root: Path) -> None:
     if not paths:
         paths = tracked_files(repo_root)
+    paths = expand_paths(paths)
     findings: list[tuple[str, str]] = []
     checked = 0
     for path in paths:

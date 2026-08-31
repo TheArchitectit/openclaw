@@ -21,9 +21,14 @@ ACP_DIR = Path.home() / ".openclaw/acp"
 CONFIG_FILE = Path(os.environ.get("ACP_REGISTRY_FILE") or (ACP_DIR / "endpoints.json"))
 
 # CLI exec path used to run the adapter. Override for testing or for adapters
-# installed outside the repository checkout.
+# installed outside the documented quick-start location (README "Install an
+# adapter"); the default matches `npm install --prefix ~/.openclaw/acp
+# @agentclientprotocol/claude-agent-acp`.
 ADAPTER_OVERRIDE_ENV = "ACP_ADAPTER_PATH"
-ADAPTER_DEFAULT = str(Path.home() / ".openclaw/acp/adapters/adapter.js")
+ADAPTER_DEFAULT = (
+    Path.home()
+    / ".openclaw/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"
+)
 EXECUTABLE = os.environ.get("ACP_ADAPTER_EXECUTABLE") or "node"
 
 # Harness-independent wrapper flags that must not reach the adapter CLI.
@@ -134,13 +139,18 @@ def main() -> None:
     entry = config["adapters"][adapter_id]
     key_value = read_key(entry["apiKeyRef"], CONFIG_FILE)
 
+    adapter_path = Path(os.environ.get(ADAPTER_OVERRIDE_ENV) or ADAPTER_DEFAULT)
+    if not adapter_path.is_file():
+        fail(
+            f"missing adapter: {adapter_path}\n"
+            "  install one per the README quick start (npm install --prefix "
+            "~/.openclaw/acp @agentclientprotocol/claude-agent-acp), or set "
+            f"{ADAPTER_OVERRIDE_ENV} to your adapter's entrypoint"
+        )
+
     os.execve(
         EXECUTABLE,
-        [
-            EXECUTABLE,
-            os.environ.get(ADAPTER_OVERRIDE_ENV) or ADAPTER_DEFAULT,
-            *strip_wrapper_flags(adapter_argv),
-        ],
+        [EXECUTABLE, str(adapter_path), *strip_wrapper_flags(adapter_argv)],
         build_env(entry, key_value, endpoint, model),
     )
 

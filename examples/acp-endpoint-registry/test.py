@@ -16,6 +16,7 @@ Covers:
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,7 @@ HERE = Path(__file__).resolve().parent
 LAUNCHER = HERE / "launcher.py"
 SCRUB = HERE / "secret-scrub.py"
 STUB = HERE / "test-stub-adapter.py"
+README = HERE / "README.md"
 
 PASS, FAIL = 0, 0
 
@@ -203,6 +205,78 @@ def test_scrub_clean_examples() -> None:
         check(f"{name} scans clean", r.returncode == 0)
 
 
+def test_scrub_scan_recurses_directories() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        nested = root / "pkg" / "deep"
+        nested.mkdir(parents=True)
+        r = subprocess.run(
+            [sys.executable, str(SCRUB), "--scan", str(root / "no-such-dir")],
+            capture_output=True, text=True,
+        )
+        check("nonexistent scan path fails loudly", r.returncode != 0)
+        check("nonexistent path message says nothing was scanned",
+              "nothing was scanned" in r.stderr)
+
+        (nested / "secret.txt").write_text('api_key = "' + "A" * 40 + '"\n')
+        r = subprocess.run(
+            [sys.executable, str(SCRUB), "--scan", str(root)],
+            capture_output=True, text=True,
+        )
+        check("scan walks directories recursively", r.returncode != 0)
+        check("recursive scan names the nested file", "secret.txt" in r.stderr)
+
+        (nested / "secret.txt").write_text("just notes, nothing secret here\n")
+        r = subprocess.run(
+            [sys.executable, str(SCRUB), "--scan", str(root)],
+            capture_output=True, text=True,
+        )
+        check("recursive scan passes a clean directory", r.returncode == 0)
+        check("recursive scan counts the files it checked", "1 text files scanned" in r.stdout)
+
+
+def test_launcher_missing_adapter_fails_closed() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_key(root, "keys/claude.key", "test-key-material-not-a-real-secret-0006")
+        config = write_registry(root, {
+            "claude": {
+                "endpoint": "http://endpoint.local:8080",
+                "apiKeyRef": "keys/claude.key",
+                "model": "default-model",
+            }
+        })
+        env = dict(os.environ)
+        env["ACP_REGISTRY_FILE"] = str(config)
+        env["ACP_ADAPTER_PATH"] = str(root / "definitely-missing-adapter.js")
+        proc = subprocess.run(
+            [sys.executable, str(LAUNCHER), "claude"],
+            capture_output=True, text=True, env=env,
+        )
+        check("missing adapter exits non-zero before exec", proc.returncode != 0)
+        check("missing adapter names the gap", "missing adapter" in proc.stderr)
+        check("missing adapter keeps the key out of stderr", "0006" not in proc.stderr)
+
+
+def test_readme_wiring_matches_acpx_agent_shape() -> None:
+    text = README.read_text()
+    wiring = None
+    for match in re.finditer(r"```json\n(\{.*?\n\})\n```", text, re.S):
+        block = json.loads(match.group(1))
+        entry = (
+            block.get("plugins", {}).get("entries", {}).get("acpx")
+        )
+        if isinstance(entry, dict) and "agents" in (entry.get("config") or {}):
+            wiring = entry["config"]["agents"]["claude"]
+            break
+    check("README contains the acpx wiring block", wiring is not None)
+    if wiring is None:
+        return
+    check("README wiring uses a single command string",
+          isinstance(wiring.get("command"), str) and wiring["command"].strip() != "")
+    check("README wiring has no separate args field", "args" not in wiring)
+
+
 def test_scrub_check_config() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -261,7 +335,10 @@ if __name__ == "__main__":
     test_launcher_happy_path()
     test_launcher_strips_wrapper_flags()
     test_launcher_config_errors()
+    test_launcher_missing_adapter_fails_closed()
+    test_readme_wiring_matches_acpx_agent_shape()
     test_scrub_scan()
+    test_scrub_scan_recurses_directories()
     test_scrub_clean_examples()
     test_scrub_check_config()
     print(f"\n{PASS} passed, {FAIL} failed")

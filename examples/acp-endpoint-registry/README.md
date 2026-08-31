@@ -62,6 +62,18 @@ adapter and asserts the environment the launcher hands over):
 python3 test.py
 ```
 
+Install an adapter for the launcher to exec. The launcher's default adapter
+path is
+`~/.openclaw/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js`,
+which this installs:
+
+```sh
+npm install --prefix ~/.openclaw/acp @agentclientprotocol/claude-agent-acp
+```
+
+Pointing at a different adapter entrypoint (any executable) is one
+environment variable: `ACP_ADAPTER_PATH=/path/to/your-adapter`.
+
 Directory layout used by the defaults (all overridable via env vars):
 `~/.openclaw/acp/endpoints.json` for the registry, `keys/` next to it for
 key files. `ACP_REGISTRY_FILE` points at a different registry, and
@@ -71,7 +83,9 @@ key files. `ACP_REGISTRY_FILE` points at a different registry, and
 
 Set your acpx config's custom agent command for the harness to invoke the
 launcher (see [ACP agents — setup](https://docs.openclaw.ai/tools/acp-agents-setup)
-for the config surface):
+for the config surface). Each agent's `command` is a single string that may
+include its arguments — the ACPX schema does not accept a separate `args`
+field:
 
 ```json
 {
@@ -82,8 +96,7 @@ for the config surface):
         "config": {
           "agents": {
             "claude": {
-              "command": "python3",
-              "args": ["/home/you/.openclaw/acp/launcher.py", "claude"]
+              "command": "python3 /home/you/.openclaw/acp/launcher.py claude"
             }
           }
         }
@@ -100,7 +113,8 @@ key material — including on failure paths.
 ## Hygiene gate
 
 ```sh
-# scan explicit paths (or all tracked git files when run from a repo)
+# scan explicit files or directories (directories are walked recursively;
+# omitted paths scan all tracked git files when run from a repo)
 python3 secret-scrub.py --scan examples/
 
 # validate the live registry + key permissions
