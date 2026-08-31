@@ -28,6 +28,10 @@ const CRON_FAILOVER_REASONS = new Set(FAILOVER_REASONS);
 const cronRunStatusSchema = z.enum(["ok", "error", "skipped"]);
 const cronCompletionStatusSchema = z.enum(["succeeded", "failed", "unknown"]);
 const cronDeliveryStatusSchema = z.enum(["delivered", "not-delivered", "unknown", "not-requested"]);
+const cronRunTriggerSourceSchema = z
+  .enum(["scheduled", "manual", "trigger-script", "on-exit", "stream"])
+  .optional()
+  .catch(undefined);
 const optionalCronStringSchema = z.string().optional().catch(undefined);
 const optionalNonBlankCronStringSchema = z
   .string()
@@ -98,6 +102,7 @@ const cronRunLogEntrySchema = z.looseObject({
     .unknown()
     .optional()
     .transform((value) => (value === true ? true : undefined)),
+  trigger: cronRunTriggerSourceSchema,
   model: optionalNonBlankCronStringSchema,
   provider: optionalNonBlankCronStringSchema,
   usage: cronUsageSchema,
@@ -172,6 +177,7 @@ export function parseCronRunLogEntryObject(
     durationMs: entryObj.durationMs,
     nextRunAtMs: entryObj.nextRunAtMs,
     triggerFired: entryObj.triggerFired,
+    trigger: entryObj.trigger,
     model: entryObj.model,
     provider: entryObj.provider,
     usage: entryObj.usage,

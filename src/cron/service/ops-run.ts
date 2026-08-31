@@ -7,7 +7,7 @@ import {
   finishCronRunReceipt,
   releaseLocalCronRunReceiptOwnership,
 } from "../store/run-receipt-store.js";
-import type { CronJob } from "../types.js";
+import type { CronJob, CronRunTriggerSource } from "../types.js";
 import { normalizeCronRunErrorText } from "./execution-errors.js";
 import { failureNotificationDeliveryFromJobState } from "./failure-alerts.js";
 import { locked } from "./locked.js";
@@ -66,6 +66,27 @@ import { wake } from "./wake.js";
 let nextManualRunId = 1;
 
 type ManualRunCoreResult = Awaited<ReturnType<typeof executeJobCoreWithTimeout>>;
+
+/**
+ * Resolves the trigger origin for a manual-path run. The schedule kind on the
+ * admitted execution job is authoritative for `on-exit` and `stream` schedules
+ * (those fire through the same `run()` seam); a populated `streamBatch` on the
+ * prepared run confirms the stream route even when the schedule has been
+ * edited out of `stream` between fire and admission. Direct operator runs fall
+ * through to `"manual"`.
+ */
+function resolveManualRunTrigger(
+  executionJob: CronJob,
+  prepared: Pick<ActivatedManualRun, "streamBatch">,
+): CronRunTriggerSource {
+  if (prepared.streamBatch !== undefined || executionJob.schedule.kind === "stream") {
+    return "stream";
+  }
+  if (executionJob.schedule.kind === "on-exit") {
+    return "on-exit";
+  }
+  return "manual";
+}
 
 function applyManualRunOutcome(params: {
   state: CronServiceState;
@@ -231,7 +252,7 @@ async function finishPreparedManualRun(
           runAtMs: startedAt,
           durationMs: Math.max(0, endedAt - startedAt),
           nextRunAtMs: job?.state.nextRunAtMs,
-          trigger: "manual",
+          trigger: resolveManualRunTrigger(executionJob, prepared),
           model: coreResult.model,
           provider: coreResult.provider,
           usage: coreResult.usage,
@@ -295,7 +316,7 @@ async function finishPreparedManualRun(
           runReceipt: prepared.runReceipt,
           startedAt,
           endedAt,
-          trigger: "manual",
+          trigger: resolveManualRunTrigger(executionJob, prepared),
         });
       }
       let removedJob: CronJob | undefined;
@@ -390,7 +411,7 @@ async function finishPreparedManualRun(
               runAtMs: startedAt,
               durationMs: committed.job.state.lastDurationMs,
               nextRunAtMs: committed.job.state.nextRunAtMs,
-              trigger: "manual",
+              trigger: resolveManualRunTrigger(executionJob, prepared),
               ...(coreResult.triggerEval?.fired ? { triggerFired: true } : {}),
               model: coreResult.model,
               provider: coreResult.provider,
