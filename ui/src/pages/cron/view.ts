@@ -58,8 +58,10 @@ import { formatUiExternalText } from "../../lib/format-error.ts";
 import { formatRelativeTimestamp, formatMs } from "../../lib/format.ts";
 import { formatCronSchedule } from "../../lib/presenter.ts";
 import { resolveScrollBehavior } from "../../lib/scroll-behavior.ts";
+import { formatCronJobKind } from "./job-kind.ts";
 import { renderSegmented } from "./segmented-control.ts";
 import { CRON_SUGGESTIONS, suggestionFormPatch } from "./suggestions.ts";
+import { groupUpcomingJobs } from "./upcoming-jobs.ts";
 import { renderRunsSection, runStatusLabel } from "./view-runs.ts";
 
 type CronPanelMode = "overview" | "create" | "job";
@@ -508,6 +510,7 @@ function renderListView(props: CronProps) {
         ${renderToolbar(props, hasAdvancedJobsFilters)}
       </div>
     `,
+    renderUpcomingPanel(props),
     html`
       <div
         id="cron-list-panel"
@@ -748,6 +751,44 @@ function renderJobsFilterPopover(props: CronProps, active: boolean) {
   `;
 }
 
+function renderUpcomingPanel(props: CronProps) {
+  const { scheduled, event } = groupUpcomingJobs(props.jobs);
+  if (scheduled.length === 0 && event.length === 0) {
+    return nothing;
+  }
+  return html`
+    <div class="cron-upcoming">
+      <div class="cron-upcoming__heading">
+        <span class="cron-upcoming__title">${t("cron.upcoming.title")}</span>
+        ${event.length > 0
+          ? html`<span class="cron-upcoming__label">${t("cron.upcoming.eventJobs")}</span>`
+          : nothing}
+      </div>
+      <div class="cron-upcoming__items">
+        ${scheduled.slice(0, 5).map((item) => {
+          const isRunning = isCronJobRunning(item.job);
+          return html`
+            <div class="cron-upcoming__item">
+              <span class="cron-upcoming__item-name">${item.job.name}</span>
+              <span class="cron-upcoming__item-eta">
+                ${isRunning ? t("cron.runs.runStatusRunning") : item.relTime}
+              </span>
+            </div>
+          `;
+        })}
+        ${event.slice(0, 3).map(
+          (item) => html`
+            <div class="cron-upcoming__item">
+              <span class="cron-upcoming__item-name">${item.job.name}</span>
+              <span class="cron-upcoming__item-eta">${formatCronSchedule(item.job)}</span>
+            </div>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
 function renderJobsTable(props: CronProps, hasAnyJobsFilters: boolean) {
   // A snapshot revision is the successful-list fact. Until one exists, show
   // pending or failure, never completed-empty guidance.
@@ -763,6 +804,7 @@ function renderJobsTable(props: CronProps, hasAnyJobsFilters: boolean) {
     >
       <div class="cron-table__head">
         <span>${t("cron.jobs.name")}</span>
+        <span>${t("cron.jobs.kind")}</span>
         <span>${t("cron.jobs.schedule")}</span>
         <span>${t("cron.jobs.nextRun")}</span>
         <span>${t("cron.jobs.lastRun")}</span>
@@ -866,6 +908,12 @@ function renderJobRow(job: CronJob, props: CronProps) {
           }
         </span>
       </button>
+      <span class="cron-table__cell cron-table__kind">
+        <span class="cron-table__cell-label">${t("cron.jobs.kind")}</span>
+        <span class="cron-table__cell-value">
+          <span class="cron-kind-badge">${formatCronJobKind(job.payload.kind)}</span>
+        </span>
+      </span>
       ${renderJobCell("cron-table__schedule", t("cron.jobs.schedule"), formatCronSchedule(job))}
       ${renderJobCell("cron-table__next", t("cron.jobs.nextRun"), nextRun)}
       ${renderJobCell("cron-table__last", t("cron.jobs.lastRun"), renderLastRunCell(job))}
@@ -1188,6 +1236,11 @@ function renderDetailHeader(props: CronProps, mode: CronPanelMode, selectedJob?:
               ? renderEnabledSwitch(props, selectedJob)
               : nothing
           }
+          ${mode === "job" && selectedJob
+            ? html`<span class="cron-kind-badge"
+                >${formatCronJobKind(selectedJob.payload.kind)}</span
+              >`
+            : nothing}
           <span class="cron-detail-sub">${subtitle}</span>
           ${selectedJob?.trigger ? renderTriggerIndicator() : nothing}
         </div>
