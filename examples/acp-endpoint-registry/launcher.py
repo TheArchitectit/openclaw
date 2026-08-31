@@ -13,6 +13,7 @@ docs/tools/acp-agents-setup.md) or run it directly for testing.
 
 import json
 import os
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -29,7 +30,19 @@ ADAPTER_DEFAULT = (
     Path.home()
     / ".openclaw/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js"
 )
-EXECUTABLE = os.environ.get("ACP_ADAPTER_EXECUTABLE") or "node"
+
+
+def resolve_executable(name: str) -> str:
+    """execve() performs no PATH lookup; bare names must be resolved first."""
+    if os.path.sep in name:
+        return name
+    resolved = shutil.which(name)
+    if resolved is None:
+        fail(f"executable not found on PATH: {name}")
+    return resolved
+
+
+EXECUTABLE = resolve_executable(os.environ.get("ACP_ADAPTER_EXECUTABLE") or "node")
 
 # Harness-independent wrapper flags that must not reach the adapter CLI.
 WRAPPER_VALUE_FLAGS = {

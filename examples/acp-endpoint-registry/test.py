@@ -205,6 +205,44 @@ def test_scrub_clean_examples() -> None:
         check(f"{name} scans clean", r.returncode == 0)
 
 
+def test_launcher_resolves_bare_executables() -> None:
+    """execve() performs no PATH lookup; a bare EXECUTABLE name must resolve.
+
+    The default EXECUTABLE is "node"; without resolution the launcher crashed
+    at os.execve (FileNotFoundError) with a valid adapter and registry — the
+    test suite missed it because every prior test set ACP_ADAPTER_EXECUTABLE
+    to an absolute path.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_key(root, "keys/claude.key", "test-key-material-not-a-real-secret-0007")
+        config = write_registry(root, {
+            "claude": {
+                "endpoint": "http://endpoint.local:8080",
+                "apiKeyRef": "keys/claude.key",
+                "model": "default-model",
+            }
+        })
+        # A "node" shim that exits 42: proves execve received an absolute path
+        # (a bare "node" would raise FileNotFoundError and exit with a traceback).
+        bindir = root / "bin"
+        bindir.mkdir()
+        shim = bindir / "node"
+        shim.write_text("#!/bin/sh\nexit 42\n", encoding="utf-8")
+        shim.chmod(0o755)
+        env = dict(os.environ)
+        env["ACP_REGISTRY_FILE"] = str(config)
+        env["ACP_ADAPTER_PATH"] = str(STUB)
+        env.pop("ACP_ADAPTER_EXECUTABLE", None)
+        env["PATH"] = str(bindir)
+        r = subprocess.run(
+            [sys.executable, str(LAUNCHER), "claude"],
+            capture_output=True, text=True, env=env,
+        )
+        check("bare executable name resolves via PATH (no execve crash)",
+              r.returncode == 42 and "Traceback" not in r.stderr)
+
+
 def test_scrub_scan_recurses_directories() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -336,6 +374,7 @@ if __name__ == "__main__":
     test_launcher_strips_wrapper_flags()
     test_launcher_config_errors()
     test_launcher_missing_adapter_fails_closed()
+    test_launcher_resolves_bare_executables()
     test_readme_wiring_matches_acpx_agent_shape()
     test_scrub_scan()
     test_scrub_scan_recurses_directories()
