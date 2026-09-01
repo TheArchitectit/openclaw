@@ -12,6 +12,7 @@ import {
   FAILOVER_REASONS,
   type FailoverReason,
 } from "../../packages/gateway-protocol/src/failover-reasons.js";
+import { resolveLegacyGatewayRestartCause } from "./completion-cause-constants.js";
 import { resolveCronCompletionStatus } from "./completion-status.js";
 import { isCronTimeoutErrorText } from "./execution-error-constants.js";
 import { normalizeCronRunDiagnosticsCore } from "./run-diagnostics-normalize.js";
@@ -183,7 +184,9 @@ export function parseCronRunLogEntryObject(
     nextRunAtMs: entryObj.nextRunAtMs,
     triggerFired: entryObj.triggerFired,
     trigger: entryObj.trigger,
-    completionCause: entryObj.completionCause,
+    // Legacy restart rows predate the typed cause; derive it from the exact
+    // canonical error string only (no fuzzy matching).
+    completionCause: entryObj.completionCause ?? resolveLegacyGatewayRestartCause(entryObj.error),
     model: entryObj.model,
     provider: entryObj.provider,
     usage: entryObj.usage,

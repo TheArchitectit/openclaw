@@ -19,6 +19,7 @@ import type {
   CronRunStatus,
   CronRunTelemetry,
   CronRunTriggerSource,
+  CronCompletionCause,
 } from "../types.js";
 import type { CronRunReceiptSettlementDisposition } from "./run-receipts.js";
 import type { CronServiceState } from "./state.js";
@@ -67,6 +68,8 @@ export type TimedCronRunOutcome = CronRunOutcome &
     nextCheck?: CronNextCheckProposal;
     /** How this run was initiated; the ledger surfaces SCHEDULED vs MANUAL. */
     trigger?: CronRunTriggerSource;
+    /** Why the run ended; orthogonal to completionStatus. */
+    completionCause?: CronCompletionCause;
   };
 
 export type CronJobRunResult = CronRunOutcome &
@@ -81,6 +84,8 @@ export type CronJobRunResult = CronRunOutcome &
     startedAt: number;
     endedAt: number;
     nextCheck?: CronNextCheckProposal;
+    /** Why the run ended; orthogonal to completionStatus. */
+    completionCause?: CronCompletionCause;
   };
 
 export type CronTriggerEvalOutcome = {

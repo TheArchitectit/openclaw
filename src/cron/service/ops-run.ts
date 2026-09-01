@@ -200,6 +200,9 @@ async function finishPreparedManualRun(
         error:
           err instanceof CronRunReceiptRevisionError ? err.message : normalizeCronRunErrorText(err),
       });
+      if (receiptSettlementDisposition === "owner-unavailable") {
+        coreResult.completionCause = "owner-unavailable";
+      }
     }
     if (prepared.onTriggerDisposition) {
       const disposition = coreResult.triggerEval?.busy
@@ -256,6 +259,9 @@ async function finishPreparedManualRun(
           model: coreResult.model,
           provider: coreResult.provider,
           usage: coreResult.usage,
+          ...(coreResult.completionCause !== undefined
+            ? { completionCause: coreResult.completionCause }
+            : {}),
         },
         tracker,
         taskRunId,
@@ -416,6 +422,9 @@ async function finishPreparedManualRun(
               model: coreResult.model,
               provider: coreResult.provider,
               usage: coreResult.usage,
+              ...(coreResult.completionCause !== undefined
+                ? { completionCause: coreResult.completionCause }
+                : {}),
             },
             prepared.terminalTracker,
             taskRunId,

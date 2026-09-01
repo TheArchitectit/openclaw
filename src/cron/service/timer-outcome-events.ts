@@ -30,6 +30,7 @@ function cronOutcomeEvent(job: CronJob, result: TimedCronRunOutcome, runAtMs: nu
     model: result.model,
     provider: result.provider,
     usage: result.usage,
+    ...(result.completionCause !== undefined ? { completionCause: result.completionCause } : {}),
   } as const;
 }
 
