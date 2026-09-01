@@ -196,6 +196,7 @@ const CRON_FIELD_LABEL_KEYS: Record<CronFieldKey, string> = {
   payloadText: "cron.form.assistantTaskPrompt",
   payloadModel: "cron.form.model",
   payloadThinking: "cron.form.thinking",
+  payloadTokenBudget: "cron.form.tokenBudget",
   timeoutSeconds: "cron.form.timeoutSeconds",
   deliveryTo: "cron.form.to",
   failureAlertAfter: "cron.form.failureAlertAfter",
@@ -806,6 +807,7 @@ function renderJobsTable(props: CronProps, hasAnyJobsFilters: boolean) {
         <span>${t("cron.jobs.name")}</span>
         <span>${t("cron.jobs.kind")}</span>
         <span>${t("cron.jobs.schedule")}</span>
+        <span>${t("cron.jobs.tokenBudget")}</span>
         <span>${t("cron.jobs.nextRun")}</span>
         <span>${t("cron.jobs.lastRun")}</span>
         ${props.canManage ? html`<span aria-hidden="true"></span>` : nothing}
@@ -915,6 +917,7 @@ function renderJobRow(job: CronJob, props: CronProps) {
         </span>
       </span>
       ${renderJobCell("cron-table__schedule", t("cron.jobs.schedule"), formatCronSchedule(job))}
+      ${renderJobCell("cron-table__budget", t("cron.jobs.tokenBudget"), formatCronTokenBudget(job))}
       ${renderJobCell("cron-table__next", t("cron.jobs.nextRun"), nextRun)}
       ${renderJobCell("cron-table__last", t("cron.jobs.lastRun"), renderLastRunCell(job))}
       ${
@@ -947,6 +950,18 @@ function renderJobRow(job: CronJob, props: CronProps) {
       }
     </div>
   `;
+}
+
+// Human-readable agent-turn token budget cell. Non-agent payloads never
+// show "Unlimited" — they have no job-policy budget at all.
+function formatCronTokenBudget(job: CronJob): string {
+  const payload = job.payload;
+  if (payload?.kind !== "agentTurn") {
+    return t("cron.form.tokenBudgetNotApplicable");
+  }
+  return typeof payload.tokenBudget === "number"
+    ? String(payload.tokenBudget)
+    : t("cron.form.tokenBudgetUnlimited");
 }
 
 function renderJobCell(className: string, label: string, value: unknown) {
@@ -1884,6 +1899,17 @@ function renderAdvanced(
                   help: t("cron.form.timeoutHelp"),
                   errorKey: "timeoutSeconds",
                   placeholder: t("cron.form.timeoutPlaceholder"),
+                })
+              : nothing
+          }
+          ${
+            ctx.isAgentTurn
+              ? renderCronInputField(props, "payloadTokenBudget", {
+                  label: t("cron.form.tokenBudget"),
+                  help: t("cron.form.tokenBudgetHelp"),
+                  errorKey: "payloadTokenBudget",
+                  placeholder: t("cron.form.tokenBudgetPlaceholder"),
+                  type: "number",
                 })
               : nothing
           }

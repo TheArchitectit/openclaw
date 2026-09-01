@@ -6551,6 +6551,7 @@ export const en: TranslationMap & {
     },
     jobs: {
       schedule: "Schedule",
+      tokenBudget: "Token budget",
       lastRun: "Last run",
       all: "All",
       condition: "Condition",
@@ -6670,6 +6671,12 @@ export const en: TranslationMap & {
       timeoutSeconds: "Timeout (seconds)",
       timeoutPlaceholder: "Optional, e.g. 90",
       timeoutHelp: "Optional. Leave blank to use the gateway default timeout for this run.",
+      tokenBudget: "Token budget",
+      tokenBudgetPlaceholder: "e.g. 120000",
+      tokenBudgetHelp:
+        "Optional job-policy token budget for this agent task. Leave blank for unlimited. This is not the session context budget.",
+      tokenBudgetUnlimited: "Unlimited",
+      tokenBudgetNotApplicable: "Not applicable",
       mainTimelineMessage: "Main timeline message",
       assistantTaskPrompt: "Prompt",
       deliveryModeLabel: "Mode",
@@ -6783,6 +6790,7 @@ export const en: TranslationMap & {
       systemTextRequired: "System text is required.",
       agentMessageRequired: "Agent message is required.",
       timeoutInvalid: "If set, timeout must be greater than 0 seconds.",
+      tokenBudgetInvalid: "If set, token budget must be a positive whole number.",
       webhookUrlRequired: "Webhook URL is required.",
       webhookUrlInvalid: "Webhook URL must start with http:// or https://.",
       invalidRunTime: "Invalid run time.",
