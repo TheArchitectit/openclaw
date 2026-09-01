@@ -704,6 +704,9 @@ export async function executeQueuedCronRun(params: {
           }),
         }),
         ...(receiptSettlementDisposition ? { receiptSettlementDisposition } : {}),
+        ...(receiptSettlementDisposition === "owner-unavailable"
+          ? { completionCause: "owner-unavailable" as const }
+          : {}),
         endedAt: state.deps.nowMs(),
       };
     }
