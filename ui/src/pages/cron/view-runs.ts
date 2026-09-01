@@ -15,6 +15,7 @@ import { toSanitizedMarkdownHtml } from "../../components/markdown.ts";
 import { i18n, t } from "../../i18n/index.ts";
 import { registerCronEnglish } from "../../i18n/locales/en-cron.ts";
 import { formatDurationCompact, formatDurationHuman } from "../../lib/format-duration.ts";
+import { runFailureLabel } from "../../lib/cron/completion-cause.ts";
 import { formatUiExternalText } from "../../lib/format-error.ts";
 import {
   formatRelativeTimestamp,
@@ -381,6 +382,17 @@ export function runStatusLabel(value: string): string {
   }
 }
 
+function runFailureLabelText(
+  entry: Parameters<typeof runFailureLabel>[0],
+  nowMs: number,
+): string | null {
+  const label = runFailureLabel(entry, nowMs);
+  if (!label) {
+    return null;
+  }
+  return t(`cron.runs.failureLabel.${label}`);
+}
+
 function runDeliveryLabel(value: string): string {
   switch (value) {
     case "delivered":
@@ -401,6 +413,7 @@ function renderRun(
   onViewRunTranscript?: (entry: CronRunLogEntry) => void,
 ) {
   const status = runStatusLabel(entry.status ?? "unknown");
+  const failure = runFailureLabelText(entry, Date.now());
   const delivery = runDeliveryLabel(entry.deliveryStatus ?? "not-requested");
   const usage = entry.usage;
   const usageSummary =
@@ -430,6 +443,13 @@ function renderRun(
           <div class="cron-run-entry__title">
             ${entry.jobName ?? entry.jobId}
             <span class="muted"> · ${status}</span>
+            ${failure
+              ? html`<span
+                  class="cron-run-entry__failure-pill"
+                  data-cause=${entry.completionCause ?? "derived"}
+                  >${failure}</span
+                >`
+              : nothing}
           </div>
           <div class="cron-run-entry__facts muted">${facts.join(" · ")}</div>
         </div>

@@ -643,6 +643,7 @@ describe("cron controller", () => {
       jobs: [
         createCronJob({
           id: "job-budget-clear",
+          name: "job-budget-clear",
           payload: { kind: "agentTurn", message: "run", tokenBudget: 90000 },
         }),
       ],
@@ -663,6 +664,7 @@ describe("cron controller", () => {
       jobs: [
         createCronJob({
           id: "job-budget-keep",
+          name: "job-budget-keep",
           payload: { kind: "agentTurn", message: "run", tokenBudget: 250000 },
         }),
       ],
