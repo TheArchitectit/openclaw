@@ -2,6 +2,7 @@ import { parseStrictFiniteNumber } from "@openclaw/normalization-core/number-coe
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
 import { sortUniqueStrings } from "@openclaw/normalization-core/string-normalization";
+import type { TaskLaneSnapshotPayload } from "../../../../packages/gateway-protocol/src/index.js";
 import { resolveCronTriggerMinIntervalMs } from "../../../../src/config/cron-limits.js";
 import { isSystemOwnedCronPayloadKind } from "../../../../src/cron/types.js";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
@@ -257,6 +258,9 @@ export type CronState = {
   cronRunsQuery: string;
   cronRunsSortDir: CronSortDir;
   cronBusy: boolean;
+  // Live task-lane snapshot for the activity panel; null until loaded.
+  taskLanes: TaskLaneSnapshotPayload | null;
+  taskLanesError: string | null;
 };
 
 export type CronModelSuggestionsState = {
@@ -315,6 +319,8 @@ export function createInitialCronState(
     cronRunsQuery: "",
     cronRunsSortDir: "desc",
     cronBusy: false,
+    taskLanes: null,
+    taskLanesError: null,
   };
 }
 
@@ -439,6 +445,28 @@ export function validateCronForm(form: CronFormState): CronFieldErrors {
 
 export function hasCronFormErrors(errors: CronFieldErrors): boolean {
   return Object.keys(errors).length > 0;
+}
+
+export async function loadTaskLanes(state: CronState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    const res = await state.client.request<TaskLaneSnapshotPayload>("taskLanes.list", {});
+    // Defensive shape check: an unexpected response must not crash the pane.
+    state.taskLanes =
+      Array.isArray(res?.lanes) && Array.isArray(res?.diagnostics)
+        ? res
+        : { lanes: [], diagnostics: [] };
+    state.taskLanesError = null;
+  } catch (err) {
+    if (isMissingOperatorReadScopeError(err)) {
+      state.taskLanes = null;
+      state.taskLanesError = formatMissingOperatorReadScopeMessage("task lanes");
+    } else {
+      state.taskLanesError = formatUiError(err);
+    }
+  }
 }
 
 export async function loadCronStatus(state: CronState) {

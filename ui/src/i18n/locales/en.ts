@@ -6579,6 +6579,13 @@ export const en: TranslationMap & {
       title: "Upcoming",
       eventJobs: "event-driven",
     },
+    lanes: {
+      title: "Task lanes",
+      empty: "No task lanes are reporting right now.",
+      providerOk: "{provider}: {lanes} lanes · {items} items",
+      providerError: "{provider}: {error}",
+      artifact: "Artifact",
+    },
     runs: {
       searchRuns: "Search runs",
       searchPlaceholder: "Summary, error, or task",
