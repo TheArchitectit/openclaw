@@ -131,6 +131,9 @@ export type CronRunStatus = "ok" | "error" | "skipped";
  */
 export type CronRunTriggerSource = "scheduled" | "manual" | "trigger-script" | "on-exit" | "stream";
 
+/** Why a run ended, orthogonal to completionStatus. Optional on persisted rows. */
+export type CronCompletionCause = "gateway-restart" | "owner-unavailable" | "budget-exhausted";
+
 /** Delivery outcome for completion or failure-notification sends. */
 export type CronDeliveryStatus = "delivered" | "not-delivered" | "unknown" | "not-requested";
 

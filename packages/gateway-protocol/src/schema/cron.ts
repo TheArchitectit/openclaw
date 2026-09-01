@@ -77,6 +77,12 @@ const CronRunTriggerSourceSchema = Type.Union([
   Type.Literal("on-exit"),
   Type.Literal("stream"),
 ]);
+/** Why a run ended; orthogonal to completionStatus. */
+const CronCompletionCauseSchema = Type.Union([
+  Type.Literal("gateway-restart"),
+  Type.Literal("owner-unavailable"),
+  Type.Literal("budget-exhausted"),
+]);
 const CronJobsSortBySchema = Type.Union([
   Type.Literal("nextRunAtMs"),
   Type.Literal("updatedAtMs"),
@@ -748,6 +754,7 @@ export const CronRunLogEntrySchema = closedObject({
   nextRunAtMs: Type.Optional(Type.Integer({ minimum: 0 })),
   triggerFired: Type.Optional(Type.Boolean()),
   trigger: Type.Optional(CronRunTriggerSourceSchema),
+  completionCause: Type.Optional(CronCompletionCauseSchema),
   model: Type.Optional(Type.String()),
   provider: Type.Optional(Type.String()),
   usage: Type.Optional(

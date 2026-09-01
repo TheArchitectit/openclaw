@@ -32,6 +32,10 @@ const cronRunTriggerSourceSchema = z
   .enum(["scheduled", "manual", "trigger-script", "on-exit", "stream"])
   .optional()
   .catch(undefined);
+const cronCompletionCauseSchema = z
+  .enum(["gateway-restart", "owner-unavailable", "budget-exhausted"])
+  .optional()
+  .catch(undefined);
 const optionalCronStringSchema = z.string().optional().catch(undefined);
 const optionalNonBlankCronStringSchema = z
   .string()
@@ -103,6 +107,7 @@ const cronRunLogEntrySchema = z.looseObject({
     .optional()
     .transform((value) => (value === true ? true : undefined)),
   trigger: cronRunTriggerSourceSchema,
+  completionCause: cronCompletionCauseSchema,
   model: optionalNonBlankCronStringSchema,
   provider: optionalNonBlankCronStringSchema,
   usage: cronUsageSchema,
@@ -178,6 +183,7 @@ export function parseCronRunLogEntryObject(
     nextRunAtMs: entryObj.nextRunAtMs,
     triggerFired: entryObj.triggerFired,
     trigger: entryObj.trigger,
+    completionCause: entryObj.completionCause,
     model: entryObj.model,
     provider: entryObj.provider,
     usage: entryObj.usage,
@@ -241,6 +247,7 @@ export function cronRunLogEntryToTaskDetail(
     nextRunAtMs: entry.nextRunAtMs,
     triggerFired: entry.triggerFired,
     trigger: entry.trigger,
+    completionCause: entry.completionCause,
     triggerStateChanged:
       options.triggerEval?.fired === true ? options.triggerEval.stateChanged : undefined,
     triggerState:

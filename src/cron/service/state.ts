@@ -17,6 +17,7 @@ import type { CronScheduledToolPolicy } from "../scheduled-tool-policy.js";
 import type { QuarantinedCronConfigJob } from "../store.js";
 import type { CronRunReceiptHandle } from "../store/run-receipt-store.js";
 import type {
+  CronCompletionCause,
   CronCompletionStatus,
   CronTriggerEvaluationResult,
   CronAgentExecutionPhaseUpdate,
@@ -68,6 +69,8 @@ export type CronEvent = {
   triggerFired?: boolean;
   /** How this run was initiated; surfaced on the run ledger. */
   trigger?: CronRunTriggerSource;
+  /** Why the run ended; orthogonal to completionStatus. */
+  completionCause?: CronCompletionCause;
 } & CronRunTelemetry;
 
 /** Transient internal context delivered beside, but never projected into, a CronEvent. */

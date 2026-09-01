@@ -6,6 +6,10 @@ import { saveTaskRegistryStateToSqlite } from "../tasks/task-registry.store.sqli
 import type { TaskRecord } from "../tasks/task-registry.types.js";
 import { resetTaskRegistryForTests } from "../tasks/task-runtime.test-helpers.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
+import {
+  isCronCompletionCause,
+  resolveLegacyGatewayRestartCause,
+} from "./completion-cause-constants.js";
 import type { CronRunLogEntry } from "./run-log-types.js";
 import { CronService } from "./service.js";
 import { createNoopLogger } from "./service.test-harness.js";
@@ -117,6 +121,42 @@ describe("cron task run history", () => {
       ).toBe(expected);
     },
   );
+
+  it("parseCronRunLogEntryObject round-trips completionCause through the schema", () => {
+    const entry = {
+      ts: 100,
+      jobId: JOB_ID,
+      action: "finished" as const,
+      completionCause: "gateway-restart",
+    };
+    const parsed = parseCronRunLogEntryObject(entry);
+    expect(parsed?.completionCause).toBe("gateway-restart");
+  });
+
+  it("parseCronRunLogEntryObject leaves completionCause undefined when absent", () => {
+    const entry = { ts: 100, jobId: JOB_ID, action: "finished" as const };
+    const parsed = parseCronRunLogEntryObject(entry);
+    expect(parsed?.completionCause).toBeUndefined();
+  });
+
+  it("resolveLegacyGatewayRestartCause returns 'gateway-restart' for exact string", () => {
+    expect(resolveLegacyGatewayRestartCause("cron: job interrupted by gateway restart")).toBe(
+      "gateway-restart",
+    );
+  });
+
+  it.each([
+    "cron: job interrupted by gateway restart ",
+    " cron: job interrupted by gateway restart",
+    "gateway-restart",
+    "",
+  ])("resolveLegacyGatewayRestartCause returns undefined for near-miss %j", (value) => {
+    expect(resolveLegacyGatewayRestartCause(value)).toBeUndefined();
+  });
+
+  it("resolveLegacyGatewayRestartCause returns undefined for undefined", () => {
+    expect(resolveLegacyGatewayRestartCause(undefined)).toBeUndefined();
+  });
 
   it("reads executions produced by the cron service from the ledger", async () => {
     await withOpenClawTestState(
