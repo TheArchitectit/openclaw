@@ -77,6 +77,9 @@ export type CronFormState = {
   payloadText: string;
   payloadModel: string;
   payloadThinking: string;
+  // Agent-turn job-policy token budget (unlimited when blank). Not
+  // contextTokenBudget and not the script payload's toolBudget.
+  payloadTokenBudget: string;
   payloadLightContext: boolean;
   deliveryMode: "none" | "announce" | "webhook";
   deliveryChannel: string;
@@ -163,6 +166,7 @@ const DEFAULT_CRON_FORM: CronFormState = {
   payloadText: "",
   payloadModel: "",
   payloadThinking: "",
+  payloadTokenBudget: "",
   payloadLightContext: false,
   deliveryMode: "none",
   deliveryChannel: "last",
@@ -192,6 +196,7 @@ export type CronFieldKey =
   | "payloadText"
   | "payloadModel"
   | "payloadThinking"
+  | "payloadTokenBudget"
   | "timeoutSeconds"
   | "deliveryTo"
   | "failureAlertAfter"
@@ -399,6 +404,13 @@ export function validateCronForm(form: CronFormState): CronFieldErrors {
       const timeout = toNumber(timeoutRaw, Number.NaN);
       if (!Number.isFinite(timeout) || timeout < 0) {
         errors.timeoutSeconds = "cron.errors.timeoutInvalid";
+      }
+    }
+    const tokenBudgetRaw = form.payloadTokenBudget.trim();
+    if (tokenBudgetRaw) {
+      const tokenBudget = toNumber(tokenBudgetRaw, Number.NaN);
+      if (!Number.isInteger(tokenBudget) || tokenBudget < 1) {
+        errors.payloadTokenBudget = "cron.errors.tokenBudgetInvalid";
       }
     }
   }
@@ -952,6 +964,10 @@ function jobToForm(job: CronJob, prev: CronFormState): CronFormState {
               : "",
     payloadModel: payload?.kind === "agentTurn" ? (payload.model ?? "") : "",
     payloadThinking: payload?.kind === "agentTurn" ? (payload.thinking ?? "") : "",
+    payloadTokenBudget:
+      payload?.kind === "agentTurn" && typeof payload.tokenBudget === "number"
+        ? String(payload.tokenBudget)
+        : "",
     payloadLightContext: payload?.kind === "agentTurn" ? payload.lightContext === true : false,
     deliveryMode: job.delivery?.mode ?? "none",
     deliveryChannel: job.delivery?.channel ?? CRON_CHANNEL_LAST,
@@ -1074,6 +1090,7 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   if (!message) {
     throw new Error(t("cron.errors.agentMessageRequiredShort"));
   }
+<<<<<<< HEAD
   const original = source?.kind === "agentTurn" ? source : undefined;
   const cloned = isUpdate ? undefined : original;
   // Blank stored overrides clear on update; a new job leaves them inherited.
@@ -1082,6 +1099,14 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   const thinking =
     form.payloadThinking.trim() ||
     (isUpdate && original?.thinking !== undefined ? null : undefined);
+  const tokenBudgetRaw = form.payloadTokenBudget.trim();
+  const parsedTokenBudget = tokenBudgetRaw ? toNumber(tokenBudgetRaw, Number.NaN) : Number.NaN;
+  const tokenBudget =
+    Number.isInteger(parsedTokenBudget) && parsedTokenBudget >= 1
+      ? parsedTokenBudget
+      : !tokenBudgetRaw && isUpdate && original?.tokenBudget !== undefined
+        ? null
+        : undefined;
   const timeoutRaw = form.timeoutSeconds.trim();
   const timeoutSeconds = toNumber(timeoutRaw, Number.NaN);
   const lightContext =
@@ -1096,6 +1121,7 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
     ...(timeoutRaw && Number.isFinite(timeoutSeconds) && timeoutSeconds >= 0
       ? { timeoutSeconds }
       : {}),
+    ...(tokenBudget !== undefined ? { tokenBudget } : {}),
     ...(lightContext !== undefined ? { lightContext } : {}),
     ...restrictions,
     ...(cloned?.fallbacks ? { fallbacks: [...cloned.fallbacks] } : {}),
@@ -1103,6 +1129,43 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
       ? { allowUnsafeExternalContent: cloned.allowUnsafeExternalContent }
       : {}),
   };
+=======
+  const payload: {
+    kind: "agentTurn";
+    message: string;
+    model?: string | null;
+    thinking?: string | null;
+    timeoutSeconds?: number;
+    tokenBudget?: number | null;
+    lightContext?: boolean;
+  } = { kind: "agentTurn", message };
+  const model = form.payloadModel.trim();
+  if (model) {
+    payload.model = model;
+  }
+  const thinking = form.payloadThinking.trim();
+  if (thinking) {
+    payload.thinking = thinking;
+  }
+  const timeoutRaw = form.timeoutSeconds.trim();
+  if (timeoutRaw) {
+    const timeoutSeconds = toNumber(timeoutRaw, Number.NaN);
+    if (Number.isFinite(timeoutSeconds) && timeoutSeconds >= 0) {
+      payload.timeoutSeconds = timeoutSeconds;
+    }
+  }
+  const tokenBudgetRaw = form.payloadTokenBudget.trim();
+  if (tokenBudgetRaw) {
+    const tokenBudget = toNumber(tokenBudgetRaw, Number.NaN);
+    if (Number.isInteger(tokenBudget) && tokenBudget >= 1) {
+      payload.tokenBudget = tokenBudget;
+    }
+  }
+  if (form.payloadLightContext) {
+    payload.lightContext = true;
+  }
+  return payload;
+>>>>>>> 5da9519a56d (feat(cron): agentTurn tokenBudget in Control UI form and job table)
 }
 
 function normalizePersistedDeliveryChannel(
