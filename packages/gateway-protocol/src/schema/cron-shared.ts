@@ -17,6 +17,7 @@ export function cronAgentTurnPayloadSchema<
   TToolsAllow extends TSchema,
   TThinking extends TSchema,
   TTimeout extends TSchema,
+  TTokenBudget extends TSchema,
 >(params: {
   message: TMessage;
   model: TModel;
@@ -24,6 +25,7 @@ export function cronAgentTurnPayloadSchema<
   toolsAllow: TToolsAllow;
   thinking: TThinking;
   timeoutSeconds: TTimeout;
+  tokenBudget: TTokenBudget;
 }) {
   return closedObject({
     kind: Type.Literal("agentTurn"),
@@ -34,6 +36,7 @@ export function cronAgentTurnPayloadSchema<
     timeoutSeconds: Type.Optional(params.timeoutSeconds),
     allowUnsafeExternalContent: Type.Optional(Type.Boolean()),
     lightContext: Type.Optional(Type.Boolean()),
+    tokenBudget: Type.Optional(params.tokenBudget),
     toolsAllow: Type.Optional(params.toolsAllow),
     // Server-managed marker for auto-stamped defaults; persisted so CLI cron
     // runs can drop only the cap that was never user-explicit.

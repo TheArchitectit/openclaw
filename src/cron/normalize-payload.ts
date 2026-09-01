@@ -6,6 +6,7 @@ import { normalizeTrimmedStringList } from "@openclaw/normalization-core/string-
 import { isRecord } from "../utils.js";
 import {
   TimeoutSecondsFieldSchema,
+  TokenBudgetFieldSchema,
   TrimmedNonEmptyStringFieldSchema,
   parseOptionalField,
 } from "./delivery-field-schemas.js";
@@ -62,7 +63,8 @@ function hasAgentTurnOnlyPayloadHint(payload: UnknownRecord): boolean {
     "thinking" in payload ||
     "timeoutSeconds" in payload ||
     typeof payload.lightContext === "boolean" ||
-    typeof payload.allowUnsafeExternalContent === "boolean"
+    typeof payload.allowUnsafeExternalContent === "boolean" ||
+    typeof payload.tokenBudget === "number"
   );
 }
 
@@ -165,6 +167,19 @@ export function normalizeCronPayload(payload: UnknownRecord): UnknownRecord {
       }
     }
   }
+  if ("tokenBudget" in next) {
+    // Preserve an explicit null so patches can clear a stored budget override.
+    if (next.tokenBudget === null) {
+      next.tokenBudget = null;
+    } else {
+      const tokenBudget = parseOptionalField(TokenBudgetFieldSchema, next.tokenBudget);
+      if (tokenBudget !== undefined) {
+        next.tokenBudget = tokenBudget;
+      } else {
+        delete next.tokenBudget;
+      }
+    }
+  }
   if (
     "allowUnsafeExternalContent" in next &&
     typeof next.allowUnsafeExternalContent !== "boolean"
@@ -191,6 +206,7 @@ export function normalizeCronPayload(payload: UnknownRecord): UnknownRecord {
     delete next.outputMaxBytes;
     delete next.script;
     delete next.toolBudget;
+    delete next.tokenBudget;
   } else if (next.kind === "agentTurn") {
     delete next.text;
     delete next.argv;
@@ -211,6 +227,7 @@ export function normalizeCronPayload(payload: UnknownRecord): UnknownRecord {
     delete next.allowUnsafeExternalContent;
     delete next.script;
     delete next.toolBudget;
+    delete next.tokenBudget;
   } else if (next.kind === "script") {
     delete next.text;
     delete next.message;
@@ -225,6 +242,7 @@ export function normalizeCronPayload(payload: UnknownRecord): UnknownRecord {
     delete next.input;
     delete next.noOutputTimeoutSeconds;
     delete next.outputMaxBytes;
+    delete next.tokenBudget;
   }
   return { ...next };
 }
