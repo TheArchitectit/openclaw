@@ -140,6 +140,7 @@ describe("listGatewayMethods", () => {
     "transcripts.list",
     "transcripts.get",
     "models.authOrderSet",
+    "taskLanes.list",
   ];
 
   it("advertises plugin surface refresh for capability rotation", () => {

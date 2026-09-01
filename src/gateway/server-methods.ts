@@ -127,6 +127,8 @@ const CORE_GATEWAY_HANDLER_MODULES = {
   "memory-search": () =>
     import("./server-methods/memory-search.js").then((module) => module.memorySearchHandlers),
   mentions: () => import("./server-methods/mentions.js").then((module) => module.mentionHandlers),
+  "task-lanes": () =>
+    import("./server-methods/task-lanes.js").then((module) => module.taskLanesHandlers),
   terminal: () => import("./server-methods/terminal.js").then((module) => module.terminalHandlers),
   transcripts: () =>
     import("./server-methods/transcripts.js").then((module) => module.transcriptsHandlers),
