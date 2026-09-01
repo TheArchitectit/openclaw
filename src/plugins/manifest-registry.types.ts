@@ -54,6 +54,7 @@ export type PluginManifestContractListKey =
   | "webFetchProviders"
   | "webSearchProviders"
   | "workerProviders"
+  | "taskLaneProviders"
   | "usageProviders"
   | "migrationProviders"
   | "gatewayMethodDispatch";
