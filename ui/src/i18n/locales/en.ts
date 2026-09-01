@@ -6462,6 +6462,15 @@ export const en: TranslationMap & {
       autoDisabledScheduleErrors: "Auto-disabled · {count} schedule errors",
       tasksTab: "Automations",
       activityTab: "Run history",
+      failureLabel: {
+        active: "Failed",
+        autoDisabled: "Auto-disabled",
+        previous: "Previous failure",
+        historical: "Historical failure",
+        gatewayRestart: "Interrupted by gateway restart",
+        ownerUnavailable: "Owner unavailable",
+        budgetExhausted: "Token budget exhausted",
+      },
     },
     suggestions: {
       title: "Starter automations",
