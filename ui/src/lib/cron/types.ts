@@ -50,6 +50,9 @@ export type CronFormState = {
   payloadText: string;
   payloadModel: string;
   payloadThinking: string;
+  // Agent-turn job-policy token budget (unlimited when blank). Not
+  // contextTokenBudget and not the script payload's toolBudget.
+  payloadTokenBudget: string;
   payloadLightContext: boolean;
   deliveryMode: "none" | "announce" | "webhook";
   deliveryChannel: string;
@@ -79,6 +82,7 @@ export type CronFieldKey =
   | "payloadText"
   | "payloadModel"
   | "payloadThinking"
+  | "payloadTokenBudget"
   | "timeoutSeconds"
   | "deliveryTo"
   | "failureAlertAfter"

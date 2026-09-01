@@ -37,6 +37,7 @@ import type { CronFieldErrors, CronFormState, CronState } from "./types.ts";
 export { loadCronScopeStats } from "./scope.ts";
 
 const CRON_CHANNEL_LAST = "last";
+
 function isCronPayload(value: unknown): value is CronPayload {
   if (!isRecord(value)) {
     return false;
@@ -104,6 +105,7 @@ const DEFAULT_CRON_FORM: CronFormState = {
   payloadText: "",
   payloadModel: "",
   payloadThinking: "",
+  payloadTokenBudget: "",
   payloadLightContext: false,
   deliveryMode: "none",
   deliveryChannel: "last",
@@ -260,6 +262,13 @@ export function validateCronForm(form: CronFormState): CronFieldErrors {
       const timeout = toNumber(timeoutRaw, Number.NaN);
       if (!Number.isFinite(timeout) || timeout < 0) {
         errors.timeoutSeconds = "cron.errors.timeoutInvalid";
+      }
+    }
+    const tokenBudgetRaw = form.payloadTokenBudget.trim();
+    if (tokenBudgetRaw) {
+      const tokenBudget = toNumber(tokenBudgetRaw, Number.NaN);
+      if (!Number.isInteger(tokenBudget) || tokenBudget < 1) {
+        errors.payloadTokenBudget = "cron.errors.tokenBudgetInvalid";
       }
     }
   }
@@ -746,6 +755,10 @@ function jobToForm(job: CronJob, prev: CronFormState): CronFormState {
               : "",
     payloadModel: payload?.kind === "agentTurn" ? (payload.model ?? "") : "",
     payloadThinking: payload?.kind === "agentTurn" ? (payload.thinking ?? "") : "",
+    payloadTokenBudget:
+      payload?.kind === "agentTurn" && typeof payload.tokenBudget === "number"
+        ? String(payload.tokenBudget)
+        : "",
     payloadLightContext: payload?.kind === "agentTurn" ? payload.lightContext === true : false,
     deliveryMode: job.delivery?.mode ?? "none",
     deliveryChannel: job.delivery?.channel ?? CRON_CHANNEL_LAST,
@@ -811,7 +824,7 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   if (!message) {
     throw new Error(t("cron.errors.agentMessageRequiredShort"));
   }
-  const original = source?.kind === "agentTurn" ? source : undefined;
+const original = source?.kind === "agentTurn" ? source : undefined;
   const cloned = isUpdate ? undefined : original;
   // Blank stored overrides clear on update; a new job leaves them inherited.
   const model =
@@ -819,6 +832,14 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   const thinking =
     form.payloadThinking.trim() ||
     (isUpdate && original?.thinking !== undefined ? null : undefined);
+  const tokenBudgetRaw = form.payloadTokenBudget.trim();
+  const parsedTokenBudget = tokenBudgetRaw ? toNumber(tokenBudgetRaw, Number.NaN) : Number.NaN;
+  const tokenBudget =
+    Number.isInteger(parsedTokenBudget) && parsedTokenBudget >= 1
+      ? parsedTokenBudget
+      : !tokenBudgetRaw && isUpdate && original?.tokenBudget !== undefined
+        ? null
+        : undefined;
   const timeoutRaw = form.timeoutSeconds.trim();
   const timeoutSeconds = toNumber(timeoutRaw, Number.NaN);
   const lightContext =
@@ -835,6 +856,7 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
       : isUpdate && original?.timeoutSeconds !== undefined
         ? { timeoutSeconds: null }
         : {}),
+    ...(tokenBudget !== undefined ? { tokenBudget } : {}),
     ...(lightContext !== undefined ? { lightContext } : {}),
     ...restrictions,
     ...(cloned?.fallbacks ? { fallbacks: [...cloned.fallbacks] } : {}),
