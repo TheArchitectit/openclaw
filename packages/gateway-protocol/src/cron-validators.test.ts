@@ -150,6 +150,33 @@ describe("cron protocol validators", () => {
     ).toBe(false);
   });
 
+  it.each(["gateway-restart", "owner-unavailable", "budget-exhausted"] as const)(
+    "accepts additive cron completion cause %s",
+    (completionCause) => {
+      expect(
+        Value.Check(CronRunLogEntrySchema, {
+          ts: 1,
+          jobId: "job-1",
+          action: "finished",
+          status: "ok",
+          completionCause,
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it("rejects unknown cron completion cause values", () => {
+    expect(
+      Value.Check(CronRunLogEntrySchema, {
+        ts: 1,
+        jobId: "job-1",
+        action: "finished",
+        status: "ok",
+        completionCause: "partial",
+      }),
+    ).toBe(false);
+  });
+
   it("rejects client-authored scheduled authority provenance", () => {
     const scheduledToolPolicy = { version: 1, mode: "trusted" } as const;
     expectCases(validateCronAddParams, false, [add({ scheduledToolPolicy })]);
