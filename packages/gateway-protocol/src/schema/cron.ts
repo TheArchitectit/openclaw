@@ -241,6 +241,7 @@ const CronAgentTurnPayloadSchema = cronAgentTurnPayloadSchema({
   fallbacks: Type.Array(Type.String()),
   toolsAllow: Type.Array(Type.String()),
   thinking: Type.String(),
+  tokenBudget: Type.Integer({ minimum: 1 }),
 });
 const CronCommandPayloadSchema = cronCommandPayloadSchema({
   argv: Type.Array(NonEmptyString, { minItems: 1 }),
@@ -286,6 +287,7 @@ const CronPayloadPatchSchema = Type.Union([
     fallbacks: Type.Union([Type.Array(Type.String()), Type.Null()]),
     toolsAllow: Type.Union([Type.Array(Type.String()), Type.Null()]),
     thinking: Type.Union([Type.String(), Type.Null()]),
+    tokenBudget: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
   }),
   cronCommandPayloadSchema({
     argv: Type.Optional(Type.Array(NonEmptyString, { minItems: 1 })),

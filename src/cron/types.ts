@@ -320,6 +320,8 @@ type CronAgentTurnPayloadFields = {
   externalContentSource?: HookExternalContentSource;
   /** If true, run with lightweight bootstrap context. */
   lightContext?: boolean;
+  /** Per-job token budget cap for agent turns. Absent means Unlimited. */
+  tokenBudget?: number;
 };
 
 type CronAgentTurnPayload = {
@@ -333,6 +335,7 @@ type CronAgentTurnPayloadPatch = {
     fallbacks?: string[] | null;
     toolsAllow?: string[] | null;
     thinking?: string | null;
+    tokenBudget?: number | null;
   };
 
 type CronCommandPayloadFields = {
