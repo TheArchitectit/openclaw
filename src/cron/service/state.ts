@@ -244,6 +244,8 @@ export type CronServiceDeps = {
       deliveryAttempted?: boolean;
       delivery?: CronDeliveryTrace;
       nextCheck?: CronNextCheckProposal;
+      /** Why the run ended; orthogonal to completionStatus. */
+      completionCause?: CronCompletionCause;
     } & CronRunOutcome &
       CronRunTelemetry
   >;
