@@ -76,4 +76,31 @@ describe("cronRunLogEntryFromEvent", () => {
       expect(entry.trigger).toBe(trigger);
     },
   );
+
+  it("leaves completionCause undefined for legacy events without the field", () => {
+    const entry = cronRunLogEntryFromEvent(
+      {
+        jobId: "legacy-job",
+        action: "finished",
+        status: "ok",
+      },
+      1,
+    );
+
+    expect(entry.completionCause).toBeUndefined();
+  });
+
+  it("preserves explicit completionCause field when present", () => {
+    const entry = cronRunLogEntryFromEvent(
+      {
+        jobId: "restart-job",
+        action: "finished",
+        status: "ok",
+        completionCause: "gateway-restart",
+      },
+      1,
+    );
+
+    expect(entry.completionCause).toBe("gateway-restart");
+  });
 });
