@@ -27,7 +27,7 @@ const JOB_KIND_LABEL_KEYS: Record<CronJobKind, string> = {
  * kinds fall back to the capitalized raw value so future additions render
  * legibly rather than vanishing silently.
  */
-export function formatCronJobKind(kind: CronJobKind | string): string {
+export function formatCronJobKind(kind: CronJobKind | (string & {})): string {
   // SAFETY: unlisted kinds index to undefined and fall through to the capitalized fallback.
   const key = JOB_KIND_LABEL_KEYS[kind as CronJobKind];
   if (key) {

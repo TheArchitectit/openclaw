@@ -305,14 +305,14 @@ type CronAgentTurnPayloadPatch = {
 } & Partial<
   Omit<
     CronAgentTurnPayloadFields,
-    "model" | "fallbacks" | "toolsAllow" | "thinking" | "timeoutSeconds"
+    "model" | "fallbacks" | "toolsAllow" | "thinking" | "timeoutSeconds" | "tokenBudget"
   >
 > & {
     model?: string | null;
     fallbacks?: string[] | null;
     toolsAllow?: string[] | null;
     thinking?: string | null;
-timeoutSeconds?: number | null;
+    timeoutSeconds?: number | null;
     tokenBudget?: number | null;
   };
 
