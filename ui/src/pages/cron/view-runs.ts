@@ -406,6 +406,26 @@ function runDeliveryLabel(value: string): string {
   }
 }
 
+/** Localized label for a recorded run origin. Missing values render nothing. */
+function runOriginLabel(trigger: string | undefined): string | null {
+  switch (trigger) {
+    case "scheduled":
+      return t("cron.runs.originScheduled");
+    case "manual":
+      return t("cron.runs.originManual");
+    case "trigger-script":
+      return t("cron.runs.originTriggerScript");
+    case "on-exit":
+      return t("cron.runs.originOnExit");
+    case "stream":
+      return t("cron.runs.originStream");
+    case undefined:
+      return null;
+    default:
+      return t("cron.runs.originLegacyUnknown");
+  }
+}
+
 function renderRun(
   entry: CronRunLogEntry,
   fallbackAgentId: string,
@@ -437,6 +457,7 @@ function renderRun(
   const showErrorInMeta = Boolean(entry.error) && Boolean(entry.summary);
   const suppressionReason = formatUiExternalText(entry.deliverySuppressionReason);
   const facts = [
+    runOriginLabel(entry.trigger),
     delivery,
     suppressionReason
       ? t("cron.runEntry.deliverySuppression", { reason: suppressionReason })
