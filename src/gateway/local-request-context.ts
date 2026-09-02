@@ -69,6 +69,7 @@ function taskLanesUnavailable(): never {
 const unavailableTaskLanes: TaskLaneGatewayService = {
   addProvider: () => taskLanesUnavailable(),
   snapshot: async () => taskLanesUnavailable(),
+  hasProviders: () => false,
   registry: () => taskLanesUnavailable(),
 };
 

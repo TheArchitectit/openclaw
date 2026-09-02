@@ -476,6 +476,12 @@ export async function loadCronStatus(state: CronState) {
   try {
     const res = await state.client.request<CronStatus>("cron.status", {});
     state.cronStatus = res;
+    // Unconfigured installs stay absent: drop any snapshot fetched before the
+    // status response resolved the capability gate.
+    if (res.taskLanesConfigured === false) {
+      state.taskLanes = null;
+      state.taskLanesError = null;
+    }
   } catch (err) {
     if (isMissingOperatorReadScopeError(err)) {
       state.cronStatus = null;
