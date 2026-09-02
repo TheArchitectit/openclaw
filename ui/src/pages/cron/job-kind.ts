@@ -28,16 +28,12 @@ const JOB_KIND_LABEL_KEYS: Record<CronJobKind, string> = {
  * legibly rather than vanishing silently.
  */
 export function formatCronJobKind(kind: CronJobKind | string): string {
+  // SAFETY: unlisted kinds index to undefined and fall through to the capitalized fallback.
   const key = JOB_KIND_LABEL_KEYS[kind as CronJobKind];
   if (key) {
     return t(key);
   }
   return capitalize(String(kind));
-}
-
-/** Stable locale-key map for callers that want the closed set directly. */
-export function cronJobKindLabelKeys(): Readonly<Record<CronJobKind, string>> {
-  return JOB_KIND_LABEL_KEYS;
 }
 
 function capitalize(value: string): string {

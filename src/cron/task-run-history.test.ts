@@ -6,10 +6,7 @@ import { saveTaskRegistryStateToSqlite } from "../tasks/task-registry.store.sqli
 import type { TaskRecord } from "../tasks/task-registry.types.js";
 import { resetTaskRegistryForTests } from "../tasks/task-runtime.test-helpers.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
-import {
-  isCronCompletionCause,
-  resolveLegacyGatewayRestartCause,
-} from "./completion-cause-constants.js";
+import { resolveLegacyGatewayRestartCause } from "./completion-cause-constants.js";
 import type { CronRunLogEntry } from "./run-log-types.js";
 import { CronService } from "./service.js";
 import { createNoopLogger } from "./service.test-harness.js";
