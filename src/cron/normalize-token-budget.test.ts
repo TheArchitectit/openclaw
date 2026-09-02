@@ -31,8 +31,10 @@ function createWith(payload: UnknownRecord): UnknownRecord {
   });
 }
 
-function patchParams(payload: UnknownRecord): UnknownRecord {
-  return { id: "job-1", patch: normalizePatch({ payload }) };
+type PatchParams = { id: string; patch: { payload: UnknownRecord } };
+
+function patchParams(payload: UnknownRecord): PatchParams {
+  return { id: "job-1", patch: normalizePatch({ payload }) } as PatchParams;
 }
 
 describe("tokenBudget protocol+normalizer end-to-end", () => {
