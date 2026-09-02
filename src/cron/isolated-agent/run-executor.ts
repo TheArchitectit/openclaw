@@ -84,6 +84,7 @@ import type {
   CronRunnerStartedInfo,
 } from "./run.types.js";
 import { isLikelyInterimCronMessage } from "./subagent-followup-hints.js";
+import { createTokenBudgetGuard } from "./token-budget-guard.js";
 
 type CronEmbeddedRuntime = typeof import("./run-embedded.runtime.js");
 type CronSubagentRegistryRuntime = typeof import("./run-subagent-registry.runtime.js");
@@ -653,6 +654,24 @@ function createCronPromptExecutor(
           to: params.resolvedDelivery.to,
           threadId: params.resolvedDelivery.threadId,
         });
+        // Budget enforcement owns its own signal: the guard aborts this
+        // controller when cumulative usage reaches the job's cap, so the run
+        // stops itself instead of only being relabeled after the fact.
+        const tokenBudget = params.agentPayload?.tokenBudget;
+        const budgetAbortController =
+          typeof tokenBudget === "number" ? new AbortController() : undefined;
+        const relayOwnerAbort = () => budgetAbortController?.abort();
+        if (budgetAbortController) {
+          params.abortSignal?.addEventListener("abort", relayOwnerAbort, { once: true });
+        }
+        const runUsageGuard =
+          budgetAbortController && typeof tokenBudget === "number"
+            ? createTokenBudgetGuard({
+                budget: tokenBudget,
+                onExceeded: () => budgetAbortController.abort(),
+                signal: params.abortSignal,
+              })
+            : undefined;
         // Embedded runs receive both the explicit route and the current-channel
         // id so message-tool policy can target the same chat as fallback delivery.
         const result = await runEmbeddedAgent({
@@ -729,11 +748,16 @@ function createCronPromptExecutor(
           requireExplicitMessageTarget: sourceDelivery.messageTool.requireExplicitTarget,
           disableMessageTool: !sourceDelivery.messageTool.enabled,
           forceMessageTool: sourceDelivery.messageTool.force,
-          allowTransientCooldownProbe: runOptions.allowTransientCooldownProbe,
+allowTransientCooldownProbe: runOptions.allowTransientCooldownProbe,
           contextEngineLogicalTurnLease: runOptions.contextEngineLogicalTurnLease,
           onContextEngineTurnCandidate: runOptions.onContextEngineTurnCandidate,
           assistantErrorTranscript: runOptions.assistantErrorTranscript,
-          abortSignal: params.abortSignal,
+          abortSignal: budgetAbortController
+            ? params.abortSignal
+              ? AbortSignal.any([params.abortSignal, budgetAbortController.signal])
+              : budgetAbortController.signal
+            : params.abortSignal,
+          onRunUsageTotals: runUsageGuard,
           onExecutionStarted: notifyExecutionStarted,
           onExecutionPhase: notifyExecutionPhase,
           onLaneWait: params.onLaneWait,

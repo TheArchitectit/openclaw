@@ -601,7 +601,8 @@ export async function prepareAndDispatchEmbeddedRunAttempt(input: {
     onReasoningEnd: params.onReasoningEnd,
     onToolResult: notifyToolResult,
     onAgentToolResult: params.onAgentToolResult,
-    onAgentEvent: notifyAgentEvent,
+onAgentEvent: notifyAgentEvent,
+    onRunUsageTotals: params.onRunUsageTotals,
     // Normalize the shipped harness alias once; attempt internals consume only the canonical flag.
     deferTerminalLifecycle: params.deferTerminalLifecycle ?? params.deferTerminalLifecycleEnd,
     onDeferredLifecycleOwner: params.onDeferredLifecycleOwner,

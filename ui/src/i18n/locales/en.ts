@@ -5240,7 +5240,7 @@ list: {
       tokenBudget: "Token budget",
       tokenBudgetPlaceholder: "e.g. 120000",
       tokenBudgetHelp:
-        "Optional job-policy token budget for this agent task. Leave blank for unlimited. This is not the session context budget.",
+        "Stops this automation once its run has spent this many tokens. Leave blank for unlimited. This is not the session context budget.",
       tokenBudgetUnlimited: "Unlimited",
       tokenBudgetNotApplicable: "Not applicable",
       mainTimelineMessage: "Main timeline message",
