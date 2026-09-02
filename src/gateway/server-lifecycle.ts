@@ -4,6 +4,7 @@ import { getTotalPendingReplies } from "../auto-reply/reply/dispatcher-registry.
 import { listLoadedChannelPlugins } from "../channels/plugins/registry-loaded.js";
 import type { ChannelId } from "../channels/plugins/types.public.js";
 import { getRuntimeConfig } from "../config/io.js";
+import { resolveStateDir } from "../config/paths.js";
 import { upsertPresence } from "../infra/system-presence.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
@@ -216,6 +217,7 @@ export async function prepareGatewayLifecycle(params: {
     }),
     gatewayMethods: listActiveGatewayMethods(pluginRuntime.baseGatewayMethods),
     taskLanesConfig: cfgAtStart.taskLanes,
+    stateDir: resolveStateDir(),
   });
   const runtimeState = runtimeStateRef.current;
   const pluginRuntimeGeneration = createGatewayPluginRuntimeGeneration({
