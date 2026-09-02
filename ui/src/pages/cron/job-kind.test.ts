@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cronJobKindLabels, formatCronJobKind } from "./job-kind.ts";
+import { cronJobKindLabelKeys, formatCronJobKind } from "./job-kind.ts";
 
 describe("formatCronJobKind", () => {
   it.each([
@@ -22,9 +22,9 @@ describe("formatCronJobKind", () => {
     expect(formatCronJobKind("")).toBe("");
   });
 
-  it("exposes the closed label map for direct callers", () => {
-    const labels = cronJobKindLabels();
-    expect(Object.keys(labels).toSorted()).toEqual(
+  it("exposes the closed locale-key map for direct callers", () => {
+    const keys = cronJobKindLabelKeys();
+    expect(Object.keys(keys).toSorted()).toEqual(
       [
         "agentTurn",
         "command",
@@ -34,5 +34,6 @@ describe("formatCronJobKind", () => {
         "systemEvent",
       ].toSorted(),
     );
+    expect(Object.values(keys).every((key) => key.startsWith("cron.jobKind."))).toBe(true);
   });
 });

@@ -1,22 +1,25 @@
 /**
- * Pure display formatter for cron job payload kinds.
+ * Display formatter for cron job payload kinds.
  *
  * Job kind (what executes) is orthogonal to run origin (what initiated the run).
  * Never collapse these two dimensions.
+ *
+ * Labels resolve through the locale catalog so non-English sessions translate.
  */
 import type { CronPayload } from "../../api/types.ts";
+import { t } from "../../i18n/index.ts";
 
 /** Closed set of job kinds this formatter handles. */
 export type CronJobKind = CronPayload["kind"];
 
-/** Display label for each known job kind. */
-const JOB_KIND_LABELS: Record<CronJobKind, string> = {
-  agentTurn: "Agent",
-  command: "Command",
-  systemEvent: "System event",
-  heartbeat: "Heartbeat",
-  skillCollectionReview: "Skill review",
-  script: "Script",
+/** Locale key for each known job kind. */
+const JOB_KIND_LABEL_KEYS: Record<CronJobKind, string> = {
+  agentTurn: "cron.jobKind.agentTurn",
+  command: "cron.jobKind.command",
+  systemEvent: "cron.jobKind.systemEvent",
+  heartbeat: "cron.jobKind.heartbeat",
+  skillCollectionReview: "cron.jobKind.skillCollectionReview",
+  script: "cron.jobKind.script",
 };
 
 /**
@@ -25,12 +28,16 @@ const JOB_KIND_LABELS: Record<CronJobKind, string> = {
  * legibly rather than vanishing silently.
  */
 export function formatCronJobKind(kind: CronJobKind | string): string {
-  return JOB_KIND_LABELS[kind as CronJobKind] ?? capitalize(String(kind));
+  const key = JOB_KIND_LABEL_KEYS[kind as CronJobKind];
+  if (key) {
+    return t(key);
+  }
+  return capitalize(String(kind));
 }
 
-/** Stable display label map for callers that want the closed set directly. */
-export function cronJobKindLabels(): Readonly<Record<CronJobKind, string>> {
-  return JOB_KIND_LABELS;
+/** Stable locale-key map for callers that want the closed set directly. */
+export function cronJobKindLabelKeys(): Readonly<Record<CronJobKind, string>> {
+  return JOB_KIND_LABEL_KEYS;
 }
 
 function capitalize(value: string): string {
