@@ -1252,7 +1252,11 @@ export function buildGatewayCronService(params: {
       await runWithGatewayIndependentRootWorkAdmission(
         async () =>
           fireOnExitJob(job, exit, {
-            run: (jobId, payload) => cron.run(jobId, "force", payload ? { payload } : undefined),
+            run: (jobId, payload) =>
+              cron.run(jobId, "force", {
+                ...(payload ? { payload } : {}),
+                triggerSource: "on-exit",
+              }),
           }),
         "cron:exit-hook",
       );
