@@ -911,6 +911,7 @@ enum class GatewayMethod(
   TranscriptsList("transcripts.list"),
   TranscriptsGet("transcripts.get"),
   ModelsAuthOrderSet("models.authOrderSet"),
+  TaskLanesList("taskLanes.list"),
 }
 
 enum class GatewayEvent(
