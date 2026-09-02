@@ -333,7 +333,12 @@ type CronAgentTurnPayload = {
 
 type CronAgentTurnPayloadPatch = {
   kind: "agentTurn";
-} & Partial<Omit<CronAgentTurnPayloadFields, "model" | "fallbacks" | "toolsAllow" | "thinking">> & {
+} & Partial<
+  Omit<
+    CronAgentTurnPayloadFields,
+    "model" | "fallbacks" | "toolsAllow" | "thinking" | "tokenBudget"
+  >
+> & {
     model?: string | null;
     fallbacks?: string[] | null;
     toolsAllow?: string[] | null;

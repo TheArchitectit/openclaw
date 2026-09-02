@@ -519,18 +519,18 @@ async function executeDetachedCronJob(
    * within budget (or exactly at it) reports no cause; a genuine producer-set
    * cause always wins.
    */
-  function detectBudgetExhausted(res: {
+  function detectBudgetExhausted(run: {
     status?: string;
     usage?: { total_tokens?: number };
     completionCause?: CronCompletionCause;
   }): boolean {
     return (
-      res.status !== "ok" &&
-      res.completionCause === undefined &&
+      run.status !== "ok" &&
+      run.completionCause === undefined &&
       job.payload.kind === "agentTurn" &&
       typeof job.payload.tokenBudget === "number" &&
-      typeof res.usage?.total_tokens === "number" &&
-      res.usage.total_tokens >= job.payload.tokenBudget
+      typeof run.usage?.total_tokens === "number" &&
+      run.usage.total_tokens >= job.payload.tokenBudget
     );
   }
 
