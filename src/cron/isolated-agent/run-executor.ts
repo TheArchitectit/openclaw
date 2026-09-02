@@ -15,6 +15,7 @@ import {
 } from "../../agents/cli-session.js";
 import { runEmbeddedAgentEntry } from "../../agents/embedded-agent-runner/run-entry.js";
 import { createDeferredEmbeddedRunLifecycleManager } from "../../agents/embedded-agent-runner/run/deferred-lifecycle-owner.js";
+import type { EmbeddedAgentRunResult } from "../../agents/embedded-agent-runner/types.js";
 import type { FastModeAutoProgressState } from "../../agents/fast-mode.js";
 import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
 import { findModelInCatalog, modelSupportsInput } from "../../agents/model-catalog-lookup.js";
@@ -84,7 +85,7 @@ import type {
   CronRunnerStartedInfo,
 } from "./run.types.js";
 import { isLikelyInterimCronMessage } from "./subagent-followup-hints.js";
-import { createTokenBudgetGuard } from "./token-budget-guard.js";
+import { createTokenBudgetGuard, type TokenBudgetGuard } from "./token-budget-guard.js";
 
 type CronEmbeddedRuntime = typeof import("./run-embedded.runtime.js");
 type CronSubagentRegistryRuntime = typeof import("./run-subagent-registry.runtime.js");
@@ -246,6 +247,53 @@ function createCronPromptExecutor(
   let hydratedThinkingSelection: string | undefined;
   const currentAttemptCommittedMedia = () =>
     hasNewGeneratedMediaTaskForSessionKey(params.runSessionKey, attemptMediaTaskIds);
+  // One logical-run budget, constructed before candidate dispatch: a budgeted
+  // run stays capped across CLI-backed candidates, fallback candidates, and
+  // continuation attempts instead of resetting per embedded candidate. CLI
+  // usage surfaces only at candidate end, so CLI enforcement stops at the
+  // candidate boundary (mid-run stop needs stream-level usage).
+  const runTokenBudget = params.agentPayload?.tokenBudget;
+  const budgetAbortController =
+    typeof runTokenBudget === "number" ? new AbortController() : undefined;
+  const relayOwnerAbort = () => budgetAbortController?.abort();
+  if (budgetAbortController) {
+    params.abortSignal?.addEventListener("abort", relayOwnerAbort, { once: true });
+  }
+  const budgetArmedAbortSignal = budgetAbortController
+    ? params.abortSignal
+      ? AbortSignal.any([params.abortSignal, budgetAbortController.signal])
+      : budgetAbortController.signal
+    : params.abortSignal;
+  const budgetTripGuard =
+    budgetAbortController && typeof runTokenBudget === "number"
+      ? createTokenBudgetGuard({
+          budget: runTokenBudget,
+          onExceeded: () => budgetAbortController.abort(),
+          signal: params.abortSignal,
+        })
+      : undefined;
+  let carriedTokenUsageTotal = 0;
+  const reportRunUsage: TokenBudgetGuard | undefined =
+    budgetTripGuard && budgetAbortController
+      ? (usage) => {
+          // Candidate-local totals restart per runtime candidate; carry the
+          // accumulated spend from earlier candidates into the tripwire.
+          if (typeof usage.total !== "number") {
+            return;
+          }
+          budgetTripGuard({ ...usage, total: usage.total + carriedTokenUsageTotal });
+        }
+      : undefined;
+  const settleCandidateUsage = (result: EmbeddedAgentRunResult) => {
+    if (!reportRunUsage || !budgetAbortController) {
+      return;
+    }
+    const usage = result.meta?.agentMeta?.usage;
+    if (usage && typeof usage.total === "number") {
+      reportRunUsage(usage);
+      carriedTokenUsageTotal += usage.total;
+    }
+  };
 
   const resolveCandidateExecution = (provider: string, model: string) => {
     const sessionRuntimeOverride = resolveSessionRuntimeOverrideForProvider({
@@ -494,7 +542,7 @@ function createCronPromptExecutor(
             sessionId: params.cronSession.sessionEntry.sessionId,
             sessionKey: params.runSessionKey,
             sessionFile,
-            abortSignal: params.abortSignal,
+            abortSignal: budgetArmedAbortSignal,
           });
           try {
             const cliAbortSignal = deferredLifecycle.signal;
@@ -632,6 +680,7 @@ function createCronPromptExecutor(
             bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
               result.meta?.systemPromptReport,
             );
+            settleCandidateUsage(result);
             return result;
           } catch (error) {
             // Process cancellation must retain the owner's terminal reason across fallback.
@@ -657,21 +706,6 @@ function createCronPromptExecutor(
         // Budget enforcement owns its own signal: the guard aborts this
         // controller when cumulative usage reaches the job's cap, so the run
         // stops itself instead of only being relabeled after the fact.
-        const tokenBudget = params.agentPayload?.tokenBudget;
-        const budgetAbortController =
-          typeof tokenBudget === "number" ? new AbortController() : undefined;
-        const relayOwnerAbort = () => budgetAbortController?.abort();
-        if (budgetAbortController) {
-          params.abortSignal?.addEventListener("abort", relayOwnerAbort, { once: true });
-        }
-        const runUsageGuard =
-          budgetAbortController && typeof tokenBudget === "number"
-            ? createTokenBudgetGuard({
-                budget: tokenBudget,
-                onExceeded: () => budgetAbortController.abort(),
-                signal: params.abortSignal,
-              })
-            : undefined;
         // Embedded runs receive both the explicit route and the current-channel
         // id so message-tool policy can target the same chat as fallback delivery.
         const result = await runEmbeddedAgent({
@@ -748,16 +782,12 @@ function createCronPromptExecutor(
           requireExplicitMessageTarget: sourceDelivery.messageTool.requireExplicitTarget,
           disableMessageTool: !sourceDelivery.messageTool.enabled,
           forceMessageTool: sourceDelivery.messageTool.force,
-allowTransientCooldownProbe: runOptions.allowTransientCooldownProbe,
+          allowTransientCooldownProbe: runOptions.allowTransientCooldownProbe,
           contextEngineLogicalTurnLease: runOptions.contextEngineLogicalTurnLease,
           onContextEngineTurnCandidate: runOptions.onContextEngineTurnCandidate,
           assistantErrorTranscript: runOptions.assistantErrorTranscript,
-          abortSignal: budgetAbortController
-            ? params.abortSignal
-              ? AbortSignal.any([params.abortSignal, budgetAbortController.signal])
-              : budgetAbortController.signal
-            : params.abortSignal,
-          onRunUsageTotals: runUsageGuard,
+          abortSignal: budgetArmedAbortSignal,
+          onRunUsageTotals: reportRunUsage,
           onExecutionStarted: notifyExecutionStarted,
           onExecutionPhase: notifyExecutionPhase,
           onLaneWait: params.onLaneWait,
@@ -770,6 +800,7 @@ allowTransientCooldownProbe: runOptions.allowTransientCooldownProbe,
         bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
           result.meta?.systemPromptReport,
         );
+        settleCandidateUsage(result);
         return result;
       },
     })
