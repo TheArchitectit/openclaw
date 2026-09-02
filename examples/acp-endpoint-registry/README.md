@@ -43,6 +43,18 @@ inline key material in the registry, `apiKeyRef` must be a path, the key file
 must exist, must be mode `0600`, and must be either outside the repo or
 gitignored.
 
+## Scope: what this covers, what core covers
+
+Core acpx is gaining native SecretRef support for **MCP server environment
+values** (structured `env`/`file`/`exec`/`store` references resolved gateway-side
+— see openclaw/openclaw#128380). That covers one leg of the credential problem.
+This example covers the other: the custom agent command path
+(`agents.<id>.command`), where OpenClaw spawns an external ACP adapter process
+and core does not (yet) inject credentials into that spawn. The launcher here
+keeps adapter credentials in a `0600` file and hands them only to the adapter
+process. If native SecretRefs later reach the adapter-launch path, this example
+becomes unnecessary — and that's fine; examples are cheap to retire.
+
 ## Quick start
 
 ```sh
