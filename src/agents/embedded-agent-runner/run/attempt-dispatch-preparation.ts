@@ -300,6 +300,7 @@ export async function prepareAndDispatchEmbeddedRunAttempt(input: {
       onRunProgress: notifyRunProgress,
       onToolResult: notifyToolResult,
       onAgentEvent: notifyAgentEvent,
+      onRunUsageTotals: params.onRunUsageTotals,
       onUserMessagePersisted: sessionPromptState.onUserMessagePersisted,
       onUserMessagePersistenceInvalidated: () => {
         sessionPromptState.activePrompt.persisted = false;
