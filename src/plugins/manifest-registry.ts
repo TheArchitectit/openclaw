@@ -320,7 +320,6 @@ function mergeManifestContracts(
     "webFetchProviders",
     "webSearchProviders",
     "workerProviders",
-    "taskLaneProviders",
     "usageProviders",
     "migrationProviders",
     "gatewayMethodDispatch",

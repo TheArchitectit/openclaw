@@ -45,7 +45,6 @@ const MANIFEST_CONTRACT_FAMILIES = [
   "webFetchProviders",
   "webSearchProviders",
   "workerProviders",
-  "taskLaneProviders",
   "usageProviders",
   "migrationProviders",
   "gatewayMethodDispatch",
