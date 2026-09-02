@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CronJob } from "../../api/types.ts";
-import { groupUpcomingJobs, hasUpcomingJobs } from "./upcoming-jobs.ts";
+import { groupUpcomingJobs } from "./upcoming-jobs.ts";
 
 function buildJob(overrides: Partial<CronJob> = {}): CronJob {
   return {
@@ -109,31 +109,6 @@ describe("groupUpcomingJobs", () => {
       event.every(
         (entry) => entry.job.schedule.kind !== "on-exit" && entry.job.schedule.kind !== "stream",
       ),
-    ).toBe(false);
-  });
-});
-
-describe("hasUpcomingJobs", () => {
-  it("returns true when at least one enabled time-scheduled job has nextRunAtMs", () => {
-    expect(hasUpcomingJobs([buildJob({ state: { nextRunAtMs: NOW + 1000 } })])).toBe(true);
-  });
-
-  it("returns true when an event-driven enabled job is present", () => {
-    expect(hasUpcomingJobs([buildJob({ schedule: { kind: "on-exit", command: "/x" } })])).toBe(
-      true,
-    );
-  });
-
-  it("returns false for an empty list", () => {
-    expect(hasUpcomingJobs([])).toBe(false);
-  });
-
-  it("returns false when every job is paused or lacks a next run", () => {
-    expect(
-      hasUpcomingJobs([
-        buildJob({ enabled: false, state: { nextRunAtMs: NOW + 1000 } }),
-        buildJob({ schedule: { kind: "on-exit", command: "/x" }, enabled: false }),
-      ]),
     ).toBe(false);
   });
 });

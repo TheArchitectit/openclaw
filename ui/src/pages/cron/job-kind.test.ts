@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cronJobKindLabelKeys, formatCronJobKind } from "./job-kind.ts";
+import { formatCronJobKind } from "./job-kind.ts";
 
 describe("formatCronJobKind", () => {
   it.each([
@@ -20,20 +20,5 @@ describe("formatCronJobKind", () => {
 
   it("falls back to empty string when given empty input", () => {
     expect(formatCronJobKind("")).toBe("");
-  });
-
-  it("exposes the closed locale-key map for direct callers", () => {
-    const keys = cronJobKindLabelKeys();
-    expect(Object.keys(keys).toSorted()).toEqual(
-      [
-        "agentTurn",
-        "command",
-        "heartbeat",
-        "script",
-        "skillCollectionReview",
-        "systemEvent",
-      ].toSorted(),
-    );
-    expect(Object.values(keys).every((key) => key.startsWith("cron.jobKind."))).toBe(true);
   });
 });
