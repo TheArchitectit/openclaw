@@ -64,17 +64,3 @@ export function groupUpcomingJobs(
 
   return { scheduled, event };
 }
-
-/** Returns true when there are any upcoming scheduled or event-driven jobs. */
-export function hasUpcomingJobs(jobs: CronJob[]): boolean {
-  return jobs.some((job) => {
-    if (!job.enabled) {
-      return false;
-    }
-    if (isTimeSchedule(job.schedule.kind)) {
-      const nextRunAtMs = job.state?.nextRunAtMs;
-      return typeof nextRunAtMs === "number" && Number.isFinite(nextRunAtMs);
-    }
-    return true;
-  });
-}
