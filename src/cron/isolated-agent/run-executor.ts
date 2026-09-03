@@ -446,6 +446,15 @@ function createCronPromptExecutor(
       carriedTokenUsageTotal += usage.total;
     }
   };
+  // Candidate usage can surface only after the candidate already returned a
+  // successful result (CLI usage is post-hoc; some providers report usage only
+  // at stream end). A trip at that point must still fail the run, otherwise a
+  // successful result would survive a cap it exceeded.
+  const throwIfBudgetTripped = () => {
+    if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+      throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`);
+    }
+  };
 
   const runPrompt = async (promptText: string) => {
     // A retry can fail during preparation, before any backend start callback.
@@ -536,7 +545,9 @@ function createCronPromptExecutor(
       }
       return candidateClassification.value;
     };
-    const fallbackResult = await runWithModelFallback({
+    let fallbackResult: Awaited<ReturnType<typeof runWithModelFallback>>;
+    try {
+      fallbackResult = await runWithModelFallback({
       cfg: params.cfgWithAgentDefaults,
       provider: params.liveSelection.provider,
       model: params.liveSelection.model,
@@ -819,6 +830,7 @@ function createCronPromptExecutor(
           );
           acceptedContextEngineTurnCandidate = contextEngineTurnCandidate;
           settleCandidateUsage(result);
+          throwIfBudgetTripped();
           return result;
         }
         const { resolveFastModeState, runEmbeddedAgent } = await cronEmbeddedRuntimeLoader.load();
@@ -943,6 +955,7 @@ function createCronPromptExecutor(
         );
         acceptedContextEngineTurnCandidate = contextEngineTurnCandidate;
         settleCandidateUsage(result);
+        throwIfBudgetTripped();
         return result;
       },
     })
@@ -955,6 +968,17 @@ function createCronPromptExecutor(
         unregisterCronRunExecSource();
         preparedRunAdmission.close();
       });
+    } catch (error) {
+      // A budget-only trip aborts the composite signal while the owner signal
+      // stays live: surface the budget, not a generic abort, as the terminal
+      // cause. Owner aborts keep their own reason.
+      if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+        throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
     const executionError =
       params.lifecycle.getDeferredError() ??
       (fallbackResult.result.meta.error || fallbackResult.outcome === "exhausted"

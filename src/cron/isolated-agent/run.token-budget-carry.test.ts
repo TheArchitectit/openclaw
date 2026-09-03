@@ -1,16 +1,20 @@
 // One logical-run token budget: fallback candidates share a single guard, so
 // spend from an earlier candidate counts against every later candidate.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { makeIsolatedAgentParamsFixture } from "./job-fixtures.js";
 import {
   clearFastTestEnv,
+  isCliProviderMock,
   loadRunCronIsolatedAgentTurn,
   logWarnMock,
   makeCronSession,
   makeCronSessionEntry,
+  mockRunCronFallbackPassthrough,
   resolveAllowedModelRefMock,
   resolveConfiguredModelRefMock,
   resolveCronSessionMock,
   resetRunCronIsolatedAgentTurnHarness,
+  runCliAgentMock,
   runEmbeddedAgentMock,
   runWithModelFallbackMock,
 } from "./run.test-harness.js";
@@ -165,6 +169,45 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
     // The second candidate was never prepared or executed.
     expect(candidateRuns).toEqual([{ abortedAtEntry: false }]);
     // The persisted terminal outcome names the budget, not a generic abort.
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Token budget exhausted");
+    expect(result.error).toContain("200");
+  });
+
+  it("fails a CLI candidate whose returned usage reaches the budget cap", async () => {
+    // CLI usage only surfaces after runCliAgent resolves: a successful result
+    // must still fail the run when its final usage meets the cap, instead of
+    // persisting a success that exceeded the budget.
+    isCliProviderMock.mockImplementation((provider: string) => provider === "claude-cli");
+    runCliAgentMock.mockImplementation(async () => ({
+      payloads: [{ text: "over cap" }],
+      meta: { agentMeta: { usage: { total: 250 } } },
+    }));
+    mockRunCronFallbackPassthrough();
+
+    const result = await runCronIsolatedAgentTurn(
+      makeIsolatedAgentParamsFixture({
+        job: {
+          id: "cron-budget-cli-job",
+          name: "Budget CLI Cap",
+          schedule: { kind: "cron", expr: "0 * * * *", tz: "UTC" },
+          sessionTarget: "isolated",
+          payload: { kind: "agentTurn", message: "run task", tokenBudget: 200 },
+        },
+        cfg: {
+          agents: {
+            defaults: {
+              model: "anthropic/claude-opus-4-6",
+              models: {
+                "anthropic/claude-opus-4-6": { agentRuntime: { id: "claude-cli" } },
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    expect(runCliAgentMock).toHaveBeenCalledOnce();
     expect(result.status).toBe("error");
     expect(result.error).toContain("Token budget exhausted");
     expect(result.error).toContain("200");

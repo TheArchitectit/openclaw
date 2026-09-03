@@ -2,15 +2,15 @@
  * UI classification labels for the runs table and the jobs table failure column.
  *
  * Producer-authored `completionCause` wins over derived attribution. When no
- * cause is set, the label falls back to a derived state from the run entry +
- * the job's last run timestamp.
+ * cause is set, the label falls back to a derived state from the run entry
+ * alone: a run-history row carries no job state, so job-level facts
+ * (auto-disable, the job's latest run) must never be inferred here.
  */
 import type { CronRunLogEntry } from "../../api/types.ts";
 
 /** Distinct failure buckets the Automations pane surfaces. */
 export type RunFailureLabel =
   | "active"
-  | "autoDisabled"
   | "previous"
   | "historical"
   | "gatewayRestart"
@@ -40,9 +40,7 @@ function isFailedRun(entry: Pick<CronRunLogEntry, "completionStatus" | "status">
 
 /** Pick the producer-authoritative label, otherwise a derived state label. */
 export function runFailureLabel(
-  entry: Pick<CronRunLogEntry, "completionCause" | "completionStatus" | "status" | "ts"> & {
-    lastRunAtMs?: number;
-  },
+  entry: Pick<CronRunLogEntry, "completionCause" | "completionStatus" | "status" | "ts">,
   nowMs: number,
 ): RunFailureLabel | null {
   if (entry.completionCause === "gateway-restart") {
@@ -57,9 +55,10 @@ export function runFailureLabel(
   if (!isFailedRun(entry)) {
     return null;
   }
-  const lastMs = typeof entry.lastRunAtMs === "number" ? entry.lastRunAtMs : entry.ts;
-  if (!Number.isFinite(lastMs)) {
+  // Recency is the run's own timestamp, never the job's last-run state: the
+  // wire entry does not carry it.
+  if (!Number.isFinite(entry.ts)) {
     return "historical";
   }
-  return nowMs - lastMs <= ACTIVE_FAILURE_WINDOW_MS ? "active" : "previous";
+  return nowMs - entry.ts <= ACTIVE_FAILURE_WINDOW_MS ? "active" : "previous";
 }
