@@ -10,7 +10,6 @@ import {
   resolveAllowedModelRefMock,
   resolveConfiguredModelRefMock,
   resolveCronSessionMock,
-  resolveSessionAuthSelectionMock,
   resetRunCronIsolatedAgentTurnHarness,
   runEmbeddedAgentMock,
   runWithModelFallbackMock,
