@@ -616,7 +616,15 @@ export async function executeQueuedCronRun(params: {
       const result = state.deps.runSchedulerOwned
         ? await state.deps.runSchedulerOwned(execute)
         : await execute();
-      outcome = { ...base, ...result, endedAt: state.deps.nowMs() };
+      // A scheduled admission whose trigger evaluation actually fired records
+      // the trigger-script origin, so the ledger does not advertise an origin
+      // the run did not use.
+      outcome = {
+        ...base,
+        ...result,
+        ...(result.triggerEval?.fired === true ? { trigger: "trigger-script" as const } : {}),
+        endedAt: state.deps.nowMs(),
+      };
     } catch (error) {
       const receiptSettlementDisposition =
         error instanceof CronRunReceiptRevisionError && error.reason === "owner-unavailable"

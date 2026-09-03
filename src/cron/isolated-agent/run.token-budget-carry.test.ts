@@ -118,4 +118,55 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
     expect(entries[1]).toEqual({ abortedAtEntry: false, abortedAfterUsage: true });
     expect(result.status).toBeDefined();
   });
+
+  it("stops fallback selection when the first candidate exhausts the budget", async () => {
+    const coordinatorSignals: Array<AbortSignal | undefined> = [];
+    const candidateRuns: Array<{ abortedAtEntry: boolean }> = [];
+    runWithModelFallbackMock.mockImplementation(
+      async ({
+        abortSignal,
+        run,
+      }: {
+        abortSignal?: AbortSignal;
+        run: (p: string, m: string) => Promise<unknown>;
+      }) => {
+        coordinatorSignals.push(abortSignal);
+        // Mirror the shared coordinator admission guard: a later candidate
+        // must not be prepared or executed once the supplied signal aborted.
+        abortSignal?.throwIfAborted();
+        const first = await run("anthropic", "model-a");
+        abortSignal?.throwIfAborted();
+        const second = await run("anthropic", "model-b");
+        return { result: second ?? first, provider: "anthropic", model: "model-b", attempts: [] };
+      },
+    );
+    runEmbeddedAgentMock.mockImplementation(
+      async (call: {
+        abortSignal?: AbortSignal;
+        onRunUsageTotals?: (usage: { total: number }) => void;
+      }) => {
+        candidateRuns.push({ abortedAtEntry: call.abortSignal?.aborted ?? false });
+        call.onRunUsageTotals?.({ total: 200 });
+        return {
+          payloads: [{ text: "partial" }],
+          meta: {
+            agentMeta: { provider: "anthropic", model: "model-a", usage: { total: 200 } },
+          },
+        };
+      },
+    );
+
+    const result = await runCronIsolatedAgentTurn(makeParams());
+
+    // The coordinator received the budget-armed composite signal, which tripped
+    // when the first candidate reported the full 200-token spend.
+    expect(coordinatorSignals).toHaveLength(1);
+    expect(coordinatorSignals[0]?.aborted).toBe(true);
+    // The second candidate was never prepared or executed.
+    expect(candidateRuns).toEqual([{ abortedAtEntry: false }]);
+    // The persisted terminal outcome names the budget, not a generic abort.
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Token budget exhausted");
+    expect(result.error).toContain("200");
+  });
 });
