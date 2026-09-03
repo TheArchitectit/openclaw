@@ -444,6 +444,15 @@ function createCronPromptExecutor(
       carriedTokenUsageTotal += usage.total;
     }
   };
+  // Candidate usage can surface only after the candidate already returned a
+  // successful result (CLI usage is post-hoc; some providers report usage only
+  // at stream end). A trip at that point must still fail the run, otherwise a
+  // successful result would survive a cap it exceeded.
+  const throwIfBudgetTripped = () => {
+    if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+      throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`);
+    }
+  };
 
   const runPrompt = async (promptText: string) => {
     // A retry can fail during preparation, before any backend start callback.
@@ -818,6 +827,7 @@ function createCronPromptExecutor(
             );
             acceptedContextEngineTurnCandidate = contextEngineTurnCandidate;
             settleCandidateUsage(result);
+            throwIfBudgetTripped();
             return result;
           }
           const { resolveFastModeState, runEmbeddedAgent } = await cronEmbeddedRuntimeLoader.load();
@@ -942,6 +952,7 @@ function createCronPromptExecutor(
           );
           acceptedContextEngineTurnCandidate = contextEngineTurnCandidate;
           settleCandidateUsage(result);
+          throwIfBudgetTripped();
           return result;
         },
       })
