@@ -78,6 +78,21 @@ function resolveManualRunTrigger(
   return "manual";
 }
 
+/**
+ * Terminal provenance for a finished run: an operator-initiated run whose
+ * trigger evaluation actually fired records the trigger-script origin, since
+ * the trigger — not the operator seam — produced the execution.
+ */
+function resolveRunTriggerOrigin(
+  prepared: Pick<ActivatedManualRun, "streamBatch" | "triggerSource">,
+  triggerFired: boolean | undefined,
+): CronRunTriggerSource {
+  if (triggerFired === true) {
+    return "trigger-script";
+  }
+  return resolveManualRunTrigger(prepared);
+}
+
 async function finishPreparedManualRun(
   state: CronServiceState,
   prepared: ActivatedManualRun,
@@ -197,7 +212,7 @@ async function finishPreparedManualRun(
           runAtMs: startedAt,
           durationMs: Math.max(0, endedAt - startedAt),
           nextRunAtMs: job?.state.nextRunAtMs,
-          trigger: resolveManualRunTrigger(prepared),
+          trigger: resolveRunTriggerOrigin(prepared, coreResult.triggerEval?.fired),
           model: coreResult.model,
           provider: coreResult.provider,
           usage: coreResult.usage,
@@ -248,7 +263,7 @@ async function finishPreparedManualRun(
           ...outcomeOptions,
           deferredNotifications: [],
         });
-recordCronOutcomeForJob(state, taskJob, { ...outcome, job: executionJob, trigger: resolveManualRunTrigger(prepared) });
+recordCronOutcomeForJob(state, taskJob, { ...outcome, job: executionJob, trigger: resolveRunTriggerOrigin(prepared, coreResult.triggerEval?.fired) });
       }
       let removedJob: CronJob | undefined;
       try {
@@ -339,7 +354,7 @@ recordCronOutcomeForJob(state, taskJob, { ...outcome, job: executionJob, trigger
               runAtMs: startedAt,
               durationMs: committed.job.state.lastDurationMs,
               nextRunAtMs: committed.job.state.nextRunAtMs,
-              trigger: resolveManualRunTrigger(prepared),
+              trigger: resolveRunTriggerOrigin(prepared, coreResult.triggerEval?.fired),
               ...(coreResult.triggerEval?.fired ? { triggerFired: true } : {}),
               model: coreResult.model,
               provider: coreResult.provider,
