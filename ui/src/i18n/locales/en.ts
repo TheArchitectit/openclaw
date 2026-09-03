@@ -5167,7 +5167,6 @@ list: {
       originLegacyUnknown: "Unknown (legacy)",
       failureLabel: {
         active: "Failed",
-        autoDisabled: "Auto-disabled",
         previous: "Previous failure",
         historical: "Historical failure",
         gatewayRestart: "Interrupted by gateway restart",

@@ -15,7 +15,9 @@ import {
 } from "../../agents/cli-session.js";
 import { runEmbeddedAgentEntry } from "../../agents/embedded-agent-runner/run-entry.js";
 import { createDeferredEmbeddedRunLifecycleManager } from "../../agents/embedded-agent-runner/run/deferred-lifecycle-owner.js";
+import { classifyEmbeddedAgentRunResultForModelFallback } from "../../agents/embedded-agent-runner/result-fallback-classifier.js";
 import type { EmbeddedAgentRunResult } from "../../agents/embedded-agent-runner/types.js";
+import type { ModelFallbackResultClassification } from "../../agents/model-fallback-attempt.js";
 import type { FastModeAutoProgressState } from "../../agents/fast-mode.js";
 import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
 import { findModelInCatalog, modelSupportsInput } from "../../agents/model-catalog-lookup.js";
@@ -294,6 +296,15 @@ function createCronPromptExecutor(
       carriedTokenUsageTotal += usage.total;
     }
   };
+  // Candidate usage can surface only after the candidate already returned a
+  // successful result (CLI usage is post-hoc; some providers report usage only
+  // at stream end). A trip at that point must still fail the run, otherwise a
+  // successful result would survive a cap it exceeded.
+  const throwIfBudgetTripped = () => {
+    if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+      throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`);
+    }
+  };
 
   const resolveCandidateExecution = (provider: string, model: string) => {
     const sessionRuntimeOverride = resolveSessionRuntimeOverrideForProvider({
@@ -378,6 +389,30 @@ function createCronPromptExecutor(
     } catch {
       // Non-canonicalizable job config: no grant registration for this run.
     }
+    // Candidate classification is prepared once per candidate result and reused
+    // across the entry's own finalization, so a budget trip observed at the
+    // candidate boundary cannot be reclassified as a clean success.
+    let candidateClassification:
+      | {
+          result: EmbeddedAgentRunResult;
+          value: ModelFallbackResultClassification;
+        }
+      | undefined;
+    const classifyResult = (result: EmbeddedAgentRunResult) => {
+      if (!candidateClassification || candidateClassification.result !== result) {
+        const classification = classifyEmbeddedAgentRunResultForModelFallback({
+          provider: params.liveSelection.provider,
+          model: params.liveSelection.model,
+          result,
+        });
+        // Preserve the pre-release decision unless finalization replaces the result.
+        candidateClassification = {
+          result,
+          value: classification && currentAttemptCommittedMedia() ? undefined : classification,
+        };
+      }
+      return candidateClassification.value;
+    };
     const fallbackResult = await runEmbeddedAgentEntry({
       selection: {
         cfg: params.cfgWithAgentDefaults,
@@ -681,6 +716,10 @@ function createCronPromptExecutor(
               result.meta?.systemPromptReport,
             );
             settleCandidateUsage(result);
+            // CLI usage surfaces only at candidate end, so a budget trip can land
+            // after the candidate already produced a successful result. Enforce the
+            // cap here so a run cannot succeed on spend it exceeded.
+            throwIfBudgetTripped();
             return result;
           } catch (error) {
             // Process cancellation must retain the owner's terminal reason across fallback.
@@ -801,6 +840,7 @@ function createCronPromptExecutor(
           result.meta?.systemPromptReport,
         );
         settleCandidateUsage(result);
+        throwIfBudgetTripped();
         return result;
       },
     })
@@ -811,6 +851,18 @@ function createCronPromptExecutor(
       .finally(() => {
         unregisterCronRunExecSource();
         closePromptAdmission();
+      })
+      .catch((error: unknown) => {
+        // A budget-only trip aborts the composite signal while the owner signal
+        // stays live: surface the budget, not a generic abort, as the terminal
+        // cause. Owner aborts keep their own reason.
+        if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+          throw new Error(
+            `Token budget exhausted: the run reached its ${runTokenBudget}-token cap`,
+            { cause: error },
+          );
+        }
+        throw error;
       });
     const executionError =
       params.lifecycle.getDeferredError() ??

@@ -12,8 +12,13 @@ import { t } from "../../i18n/index.ts";
 /** Closed set of job kinds this formatter handles. */
 export type CronJobKind = CronPayload["kind"];
 
-/** Locale key for each known job kind. */
-const JOB_KIND_LABEL_KEYS: Record<CronJobKind, string> = {
+/**
+ * Runtime job kinds this formatter localizes. Deliberately wider than
+ * `CronJobKind`: some kinds (e.g. `skillCollectionReview`) exist only as
+ * runtime payloads and are absent from the protocol union, so they must stay
+ * renderable here without widening the wire contract.
+ */
+const JOB_KIND_LABEL_KEYS: Record<string, string> = {
   agentTurn: "cron.jobKind.agentTurn",
   command: "cron.jobKind.command",
   systemEvent: "cron.jobKind.systemEvent",
