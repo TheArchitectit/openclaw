@@ -474,13 +474,15 @@ function renderRun(
           <div class="cron-run-entry__title">
             ${entry.jobName ?? entry.jobId}
             <span class="muted"> · ${status}</span>
-            ${failure
-              ? html`<span
-                  class="cron-run-entry__failure-pill"
-                  data-cause=${entry.completionCause ?? "derived"}
-                  >${failure}</span
-                >`
-              : nothing}
+            ${
+              failure
+                ? html`<span
+                    class="cron-run-entry__failure-pill"
+                    data-cause=${entry.completionCause ?? "derived"}
+                    >${failure}</span
+                  >`
+                : nothing
+            }
           </div>
           <div class="cron-run-entry__facts muted">${facts.join(" · ")}</div>
         </div>
