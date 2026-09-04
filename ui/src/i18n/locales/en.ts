@@ -6585,6 +6585,9 @@ export const en: TranslationMap & {
       providerOk: "{provider}: {lanes} lanes · {items} items",
       providerError: "{provider}: {error}",
       artifact: "Artifact",
+      itemsShownOfTotal: "{shown} of {total}",
+      truncated:
+        "Showing {shown} of {total} items (snapshot page limit). Lane counts include off-page items.",
     },
     runs: {
       searchRuns: "Search runs",
