@@ -824,7 +824,7 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   if (!message) {
     throw new Error(t("cron.errors.agentMessageRequiredShort"));
   }
-const original = source?.kind === "agentTurn" ? source : undefined;
+  const original = source?.kind === "agentTurn" ? source : undefined;
   const cloned = isUpdate ? undefined : original;
   // Blank stored overrides clear on update; a new job leaves them inherited.
   const model =
