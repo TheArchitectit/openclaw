@@ -6202,7 +6202,7 @@ export const en: TranslationMap & {
       tokenBudget: "Token budget",
       tokenBudgetPlaceholder: "e.g. 120000",
       tokenBudgetHelp:
-        "Stops this automation once its run has spent this many tokens. Leave blank for unlimited. This is not the session context budget.",
+        "Observed-use threshold: the run is cancelled once it has spent about this many tokens. Because cancellation fires after a candidate finishes, one in-flight candidate can overshoot before the run stops — treat this as a soft threshold, not a hard cap. Counts cumulatively across the run's candidates and is separate from the session context budget. Leave blank for unlimited; clear an earlier value to remove it.",
       tokenBudgetUnlimited: "Unlimited",
       tokenBudgetNotApplicable: "Not applicable",
       mainTimelineMessage: "Main timeline message",
