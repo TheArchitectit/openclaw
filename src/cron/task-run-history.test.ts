@@ -6,7 +6,6 @@ import { saveTaskRegistryStateToSqlite } from "../tasks/task-registry.store.sqli
 import type { TaskRecord } from "../tasks/task-registry.types.js";
 import { resetTaskRegistryForTests } from "../tasks/task-runtime.test-helpers.js";
 import { withOpenClawTestState } from "../test-utils/openclaw-test-state.js";
-import { resolveLegacyGatewayRestartCause } from "./completion-cause-constants.js";
 import type { CronRunLogEntry } from "./run-log-types.js";
 import { CronService } from "./service.js";
 import { createNoopLogger } from "./service.test-harness.js";
@@ -136,23 +135,18 @@ describe("cron task run history", () => {
     expect(parsed?.completionCause).toBeUndefined();
   });
 
-  it("resolveLegacyGatewayRestartCause returns 'gateway-restart' for exact string", () => {
-    expect(resolveLegacyGatewayRestartCause("cron: job interrupted by gateway restart")).toBe(
-      "gateway-restart",
-    );
-  });
-
-  it.each([
-    "cron: job interrupted by gateway restart ",
-    " cron: job interrupted by gateway restart",
-    "gateway-restart",
-    "",
-  ])("resolveLegacyGatewayRestartCause returns undefined for near-miss %j", (value) => {
-    expect(resolveLegacyGatewayRestartCause(value)).toBeUndefined();
-  });
-
-  it("resolveLegacyGatewayRestartCause returns undefined for undefined", () => {
-    expect(resolveLegacyGatewayRestartCause(undefined)).toBeUndefined();
+  it("parseCronRunLogEntryObject never reclassifies legacy restart rows at read time", () => {
+    // A pre-typed-cause ledger row carries only the legacy error string; the
+    // read path must not synthesize a terminal cause the producer never wrote.
+    const entry = {
+      ts: 100,
+      jobId: JOB_ID,
+      action: "finished" as const,
+      status: "error" as const,
+      error: "cron: job interrupted by gateway restart",
+    };
+    const parsed = parseCronRunLogEntryObject(entry);
+    expect(parsed?.completionCause).toBeUndefined();
   });
 
   it("reads executions produced by the cron service from the ledger", async () => {
