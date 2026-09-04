@@ -767,9 +767,11 @@ function renderUpcomingPanel(props: CronProps) {
     <div class="cron-upcoming">
       <div class="cron-upcoming__heading">
         <span class="cron-upcoming__title">${t("cron.upcoming.title")}</span>
-        ${event.length > 0
-          ? html`<span class="cron-upcoming__label">${t("cron.upcoming.eventJobs")}</span>`
-          : nothing}
+        ${
+          event.length > 0
+            ? html`<span class="cron-upcoming__label">${t("cron.upcoming.eventJobs")}</span>`
+            : nothing
+        }
       </div>
       <div class="cron-upcoming__items">
         ${scheduled.slice(0, 5).map((item) => {
@@ -1257,11 +1259,13 @@ function renderDetailHeader(props: CronProps, mode: CronPanelMode, selectedJob?:
               ? renderEnabledSwitch(props, selectedJob)
               : nothing
           }
-          ${mode === "job" && selectedJob
-            ? html`<span class="cron-kind-badge"
-                >${formatCronJobKind(selectedJob.payload.kind)}</span
-              >`
-            : nothing}
+          ${
+            mode === "job" && selectedJob
+              ? html`<span class="cron-kind-badge"
+                  >${formatCronJobKind(selectedJob.payload.kind)}</span
+                >`
+              : nothing
+          }
           <span class="cron-detail-sub">${subtitle}</span>
           ${selectedJob?.trigger ? renderTriggerIndicator() : nothing}
         </div>
