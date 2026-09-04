@@ -1090,7 +1090,6 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
   if (!message) {
     throw new Error(t("cron.errors.agentMessageRequiredShort"));
   }
-<<<<<<< HEAD
   const original = source?.kind === "agentTurn" ? source : undefined;
   const cloned = isUpdate ? undefined : original;
   // Blank stored overrides clear on update; a new job leaves them inherited.
@@ -1129,43 +1128,6 @@ function buildCronPayload(form: CronFormState, source: CronPayload | null, isUpd
       ? { allowUnsafeExternalContent: cloned.allowUnsafeExternalContent }
       : {}),
   };
-=======
-  const payload: {
-    kind: "agentTurn";
-    message: string;
-    model?: string | null;
-    thinking?: string | null;
-    timeoutSeconds?: number;
-    tokenBudget?: number | null;
-    lightContext?: boolean;
-  } = { kind: "agentTurn", message };
-  const model = form.payloadModel.trim();
-  if (model) {
-    payload.model = model;
-  }
-  const thinking = form.payloadThinking.trim();
-  if (thinking) {
-    payload.thinking = thinking;
-  }
-  const timeoutRaw = form.timeoutSeconds.trim();
-  if (timeoutRaw) {
-    const timeoutSeconds = toNumber(timeoutRaw, Number.NaN);
-    if (Number.isFinite(timeoutSeconds) && timeoutSeconds >= 0) {
-      payload.timeoutSeconds = timeoutSeconds;
-    }
-  }
-  const tokenBudgetRaw = form.payloadTokenBudget.trim();
-  if (tokenBudgetRaw) {
-    const tokenBudget = toNumber(tokenBudgetRaw, Number.NaN);
-    if (Number.isInteger(tokenBudget) && tokenBudget >= 1) {
-      payload.tokenBudget = tokenBudget;
-    }
-  }
-  if (form.payloadLightContext) {
-    payload.lightContext = true;
-  }
-  return payload;
->>>>>>> 5da9519a56d (feat(cron): agentTurn tokenBudget in Control UI form and job table)
 }
 
 function normalizePersistedDeliveryChannel(
