@@ -545,9 +545,7 @@ function createCronPromptExecutor(
       }
       return candidateClassification.value;
     };
-    let fallbackResult: Awaited<ReturnType<typeof runWithModelFallback>>;
-    try {
-      fallbackResult = await runWithModelFallback({
+    const fallbackResult = await runWithModelFallback({
       cfg: params.cfgWithAgentDefaults,
       provider: params.liveSelection.provider,
       model: params.liveSelection.model,
@@ -562,7 +560,7 @@ function createCronPromptExecutor(
         params.liveSelection.authProfileIdSource === "user"
           ? params.liveSelection.authProfileId
           : undefined,
-      abortSignal: params.abortSignal,
+      abortSignal: budgetArmedAbortSignal,
       resolveAgentHarnessRuntimeOverride: (provider) =>
         resolveSessionRuntimeOverrideForProvider({
           provider,
@@ -962,23 +960,23 @@ function createCronPromptExecutor(
       .catch(async (error: unknown) => {
         params.lifecycle.capture("error", error);
         await contextEngineLogicalTurnLease.dispose();
+        // A budget-only trip aborts the composite signal while the owner
+        // signal stays live: surface the budget, not a generic abort, as the
+        // terminal cause. Owner aborts keep their own reason.
+        if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
+          throw new Error(
+            `Token budget exhausted: the run reached its ${runTokenBudget}-token cap`,
+            {
+              cause: error,
+            },
+          );
+        }
         throw error;
       })
       .finally(() => {
         unregisterCronRunExecSource();
         preparedRunAdmission.close();
       });
-    } catch (error) {
-      // A budget-only trip aborts the composite signal while the owner signal
-      // stays live: surface the budget, not a generic abort, as the terminal
-      // cause. Owner aborts keep their own reason.
-      if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
-        throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`, {
-          cause: error,
-        });
-      }
-      throw error;
-    }
     const executionError =
       params.lifecycle.getDeferredError() ??
       (fallbackResult.result.meta.error || fallbackResult.outcome === "exhausted"
