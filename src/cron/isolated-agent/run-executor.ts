@@ -91,7 +91,11 @@ import {
 } from "./run-session-state.js";
 import { resolveEffectiveAgentRuntime, resolveThinkingDefault } from "./run.runtime.js";
 import { isLikelyInterimCronMessage } from "./subagent-followup-hints.js";
-import { createTokenBudgetGuard, type TokenBudgetGuard } from "./token-budget-guard.js";
+import {
+  CronTokenBudgetExhaustedError,
+  createTokenBudgetGuard,
+  type TokenBudgetGuard,
+} from "./token-budget-guard.js";
 
 type AgentTurnPayload = Extract<CronJob["payload"], { kind: "agentTurn" }> | null;
 
@@ -425,6 +429,13 @@ function createCronPromptExecutor(
         })
       : undefined;
   let carriedTokenUsageTotal = 0;
+  // Last usage total reported by the in-flight candidate (candidate-local
+  // cumulative, so a later report supersedes an earlier one within a
+  // candidate). Retained into `carriedTokenUsageTotal` when the candidate
+  // ends — on settle via the result's final total, on a throw via `onError` —
+  // so a candidate that reports spend and then throws still counts toward
+  // the next candidate's tripwire.
+  let currentCandidateUsage = 0;
   const reportRunUsage: TokenBudgetGuard | undefined =
     budgetTripGuard && budgetAbortController
       ? (usage) => {
@@ -433,6 +444,7 @@ function createCronPromptExecutor(
           if (typeof usage.total !== "number") {
             return;
           }
+          currentCandidateUsage = usage.total;
           budgetTripGuard({ ...usage, total: usage.total + carriedTokenUsageTotal });
         }
       : undefined;
@@ -444,15 +456,20 @@ function createCronPromptExecutor(
     if (usage && typeof usage.total === "number") {
       reportRunUsage(usage);
       carriedTokenUsageTotal += usage.total;
+      currentCandidateUsage = 0;
     }
   };
+  const totalObservedTokenUsage = () => carriedTokenUsageTotal + currentCandidateUsage;
   // Candidate usage can surface only after the candidate already returned a
   // successful result (CLI usage is post-hoc; some providers report usage only
   // at stream end). A trip at that point must still fail the run, otherwise a
   // successful result would survive a cap it exceeded.
   const throwIfBudgetTripped = () => {
     if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
-      throw new Error(`Token budget exhausted: the run reached its ${runTokenBudget}-token cap`);
+      throw new CronTokenBudgetExhaustedError({
+        budget: runTokenBudget as number,
+        usageTotal: totalObservedTokenUsage(),
+      });
     }
   };
 
@@ -561,6 +578,17 @@ function createCronPromptExecutor(
           ? params.liveSelection.authProfileId
           : undefined,
       abortSignal: budgetArmedAbortSignal,
+      // A candidate that reported usage and then threw a fallback-eligible
+      // error still spent those tokens; retain the observed total before the
+      // next candidate runs so its tripwire includes the spend. Settled
+      // candidates have already folded their total in (currentCandidateUsage
+      // reset to 0), so this is a no-op for them.
+      onError: () => {
+        if (currentCandidateUsage > 0) {
+          carriedTokenUsageTotal += currentCandidateUsage;
+          currentCandidateUsage = 0;
+        }
+      },
       resolveAgentHarnessRuntimeOverride: (provider) =>
         resolveSessionRuntimeOverrideForProvider({
           provider,
@@ -964,12 +992,11 @@ function createCronPromptExecutor(
         // signal stays live: surface the budget, not a generic abort, as the
         // terminal cause. Owner aborts keep their own reason.
         if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
-          throw new Error(
-            `Token budget exhausted: the run reached its ${runTokenBudget}-token cap`,
-            {
-              cause: error,
-            },
-          );
+          throw new CronTokenBudgetExhaustedError({
+            budget: runTokenBudget as number,
+            usageTotal: totalObservedTokenUsage(),
+            cause: error,
+          });
         }
         throw error;
       })

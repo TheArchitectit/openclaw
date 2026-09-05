@@ -212,4 +212,100 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
     expect(result.error).toContain("Token budget exhausted");
     expect(result.error).toContain("200");
   });
+
+  it("retains a throwing candidate's observed usage against the next candidate's tripwire", async () => {
+    // A candidate that reports spend and then throws a fallback-eligible
+    // error still consumed those tokens. Without retention (onError),
+    // candidate B starts fresh: its 150-token report would not trip a
+    // 200-token budget even though A+B = 300. The onError hook folds A's
+    // observed total into the carried spend before B runs, so B's report
+    // trips the shared guard.
+    const candidateSignals: Array<{ candidate: string; abortedAfterUsage: boolean }> = [];
+    runWithModelFallbackMock.mockImplementation(
+      async ({
+        run,
+        onError,
+      }: {
+        run: (p: string, m: string) => Promise<unknown>;
+        onError?: () => void;
+      }) => {
+        try {
+          await run("anthropic", "model-a");
+        } catch {
+          // Mirror the real coordinator: the throwing candidate's observed
+          // usage is retained before the next candidate is prepared.
+          onError?.();
+          const second = await run("anthropic", "model-b");
+          return { result: second, provider: "anthropic", model: "model-b", attempts: [] };
+        }
+        return { result: null, provider: "anthropic", model: "model-a", attempts: [] };
+      },
+    );
+    runEmbeddedAgentMock.mockImplementation(
+      async (call: {
+        abortSignal?: AbortSignal;
+        onRunUsageTotals?: (usage: { total: number }) => void;
+      }) => {
+        const signal = call.abortSignal;
+        call.onRunUsageTotals?.({ total: 150 });
+        candidateSignals.push({
+          candidate: candidateSignals.length === 0 ? "model-a" : "model-b",
+          abortedAfterUsage: signal?.aborted ?? false,
+        });
+        if (candidateSignals.length === 1) {
+          // Candidate A reports 150 then throws a fallback-eligible error.
+          throw new Error("provider transient error");
+        }
+        return {
+          payloads: [{ text: "partial" }],
+          meta: {
+            agentMeta: { provider: "anthropic", model: "model-b", usage: { total: 150 } },
+          },
+        };
+      },
+    );
+
+    const result = await runCronIsolatedAgentTurn(makeParams());
+
+    expect(candidateSignals).toHaveLength(2);
+    // Candidate A reported 150 (no trip yet) then threw.
+    expect(candidateSignals[0]).toEqual({ candidate: "model-a", abortedAfterUsage: false });
+    // Candidate B inherited A's 150 carry; its 150 report trips 150+150=300.
+    expect(candidateSignals[1].candidate).toBe("model-b");
+    expect(candidateSignals[1].abortedAfterUsage).toBe(true);
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Token budget exhausted");
+    expect(result.error).toContain("200");
+  });
+
+  it("carries the observed usage total on a budget-trip error so the service layer classifies budget-exhausted", async () => {
+    // detectBudgetExhausted classifies `budget-exhausted` only when the run
+    // result carries usage.total_tokens >= tokenBudget and no producer-set
+    // completionCause. The run boundary must surface the producer-recorded
+    // total on the error result instead of an opaque, usage-less failure.
+    mockRunCronFallbackPassthrough();
+    runEmbeddedAgentMock.mockImplementation(
+      async (call: {
+        abortSignal?: AbortSignal;
+        onRunUsageTotals?: (usage: { total: number }) => void;
+      }) => {
+        call.onRunUsageTotals?.({ total: 220 });
+        return {
+          payloads: [{ text: "over cap" }],
+          meta: {
+            agentMeta: { provider: "anthropic", model: "model-a", usage: { total: 220 } },
+          },
+        };
+      },
+    );
+
+    const result = await runCronIsolatedAgentTurn(makeParams());
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Token budget exhausted");
+    // The error result carries the observed spend so detectBudgetExhausted
+    // (timer-execution.ts) classifies `budget-exhausted` rather than seeing a
+    // usage-less generic failure.
+    expect(result.usage).toEqual({ total_tokens: 220 });
+  });
 });
