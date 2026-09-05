@@ -1,6 +1,5 @@
 /** Repairs interrupted and finalized cron runs while the service starts. */
 import { asDateTimestampMs } from "@openclaw/normalization-core/number-coercion";
-import { CRON_STARTUP_INTERRUPTED_ERROR as STARTUP_INTERRUPTED_ERROR } from "../completion-cause-constants.js";
 import { resolveCronCompletionStatus } from "../completion-status.js";
 import { parseAbsoluteTimeMs } from "../parse.js";
 import type { CronRunLogEntry } from "../run-log-types.js";
@@ -15,6 +14,9 @@ import {
   applyTriggerNoFireResult,
 } from "./timer-outcomes.js";
 import { applyTriggerRunResult } from "./timer-trigger.js";
+
+/** Exact legacy error string produced by the gateway restart interrupt path. */
+export const STARTUP_INTERRUPTED_ERROR = "cron: job interrupted by gateway restart";
 
 export type InterruptedStartupRun = {
   jobId: string;

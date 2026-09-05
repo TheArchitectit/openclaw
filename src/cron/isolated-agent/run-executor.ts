@@ -457,7 +457,9 @@ function createCronPromptExecutor(
       },
       behavior: { kind: "command-rpc", hasCommittedSideEffect: currentAttemptCommittedMedia },
       sessionOverride: { kind: "preserve" },
-      abortSignal: params.abortSignal,
+      // Arm the entry itself with the budget composite so a trip cancels the run
+      // mid-flight; the owner signal still rides along and keeps its own reason.
+      abortSignal: budgetArmedAbortSignal,
       runCandidate: async (providerOverride, modelOverride, runOptions) => {
         params.lifecycle.beginAttempt();
         const notifyExecutionStarted = (info?: { lifecycleGeneration?: string }) =>
