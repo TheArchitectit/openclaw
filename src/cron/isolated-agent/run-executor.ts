@@ -13,14 +13,14 @@ import {
   applyCliSessionBindingResult,
   assertCliSessionBindingResultCommitAllowed,
 } from "../../agents/cli-session.js";
+import { classifyEmbeddedAgentRunResultForModelFallback } from "../../agents/embedded-agent-runner/result-fallback-classifier.js";
 import { runEmbeddedAgentEntry } from "../../agents/embedded-agent-runner/run-entry.js";
 import { createDeferredEmbeddedRunLifecycleManager } from "../../agents/embedded-agent-runner/run/deferred-lifecycle-owner.js";
-import { classifyEmbeddedAgentRunResultForModelFallback } from "../../agents/embedded-agent-runner/result-fallback-classifier.js";
 import type { EmbeddedAgentRunResult } from "../../agents/embedded-agent-runner/types.js";
-import type { ModelFallbackResultClassification } from "../../agents/model-fallback-attempt.js";
 import type { FastModeAutoProgressState } from "../../agents/fast-mode.js";
 import { runAgentHarnessBeforeMessageWriteHook } from "../../agents/harness/hook-helpers.js";
 import { findModelInCatalog, modelSupportsInput } from "../../agents/model-catalog-lookup.js";
+import type { ModelFallbackResultClassification } from "../../agents/model-fallback-attempt.js";
 import { resolveCliRuntimeExecutionProvider } from "../../agents/model-runtime-aliases.js";
 import { resolveConfiguredThinkingDefault } from "../../agents/model-thinking-default.js";
 import { rootedAgentRunParams } from "../../agents/rooted-run-params.js";
@@ -346,7 +346,10 @@ function createCronPromptExecutor(
     };
   };
 
-  return async (promptText: string, runStartedAt: number): Promise<CronCompletedPromptRun> => {
+  const executePrompt = async (
+    promptText: string,
+    runStartedAt: number,
+  ): Promise<CronCompletedPromptRun> => {
     // A retry can fail during preparation, before any backend start callback.
     params.lifecycle.beginAttempt();
     const sessionTarget = {
@@ -895,12 +898,14 @@ function createCronPromptExecutor(
       .catch((error: unknown) => {
         // A budget-only trip aborts the composite signal while the owner signal
         // stays live: surface the budget, not a generic abort, as the terminal
-        // cause. Owner aborts keep their own reason.
+        // cause. Owner aborts keep their own reason. The typed error carries the
+        // observed total so the run boundary can classify `budget-exhausted`.
         if (budgetAbortController?.signal.aborted && !params.abortSignal?.aborted) {
-          throw new Error(
-            `Token budget exhausted: the run reached its ${runTokenBudget}-token cap`,
-            { cause: error },
-          );
+          throw new CronTokenBudgetExhaustedError({
+            budget: runTokenBudget as number,
+            usageTotal: totalObservedTokenUsage(),
+            cause: error,
+          });
         }
         throw error;
       });
@@ -937,6 +942,18 @@ function createCronPromptExecutor(
     pendingUserTurn = undefined;
     return completed;
   };
+
+  // The live model-switch retry loop lives outside this closure but must still
+  // fold a switched-out candidate's observed spend into the run total; ordinary
+  // fallback errors are handled by onFallbackStep inside the entry.
+  executePrompt.retainObservedUsage = () => {
+    if (currentCandidateUsage > 0) {
+      carriedTokenUsageTotal += currentCandidateUsage;
+      currentCandidateUsage = 0;
+    }
+  };
+
+  return executePrompt;
 }
 
 /** Executes an isolated cron prompt, including live model-switch and interim-ack retries. */
@@ -960,6 +977,9 @@ export async function executeCronRun(params: CronRunExecutionParams): Promise<Cr
       params.onPromptCompleted?.(completedPromptRuns);
     },
   });
+  // Retain the inner executor's observed usage here so a live model-switch
+  // retry can fold the switched-out candidate's spend into the run total.
+  const retainPromptUsage = runPrompt.retainObservedUsage;
 
   const MAX_MODEL_SWITCH_RETRIES = 2;
   let modelSwitchRetries = 0;
@@ -1007,12 +1027,9 @@ export async function executeCronRun(params: CronRunExecutionParams): Promise<Cr
       }
       // Retain observed usage before the switch retry so the next
       // candidate's budget tripwire includes the spend from the
-      // switched-out candidate (onError does this for ordinary
+      // switched-out candidate (onFallbackStep does this for ordinary
       // fallback errors; model-switch exits bypass that callback).
-      if (currentCandidateUsage > 0) {
-        carriedTokenUsageTotal += currentCandidateUsage;
-        currentCandidateUsage = 0;
-      }
+      retainPromptUsage();
       continue;
     }
   }

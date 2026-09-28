@@ -1,6 +1,7 @@
 // One logical-run token budget: fallback candidates share a single guard, so
 // spend from an earlier candidate counts against every later candidate.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { runInitialModelFallbackAttempt } from "../../agents/test-helpers/model-fallback-runner.test-support.js";
 import { makeIsolatedAgentParamsFixture } from "./job-fixtures.js";
 import {
   clearFastTestEnv,
@@ -83,11 +84,24 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
   it("aborts later candidates once earlier candidates exhausted the budget", async () => {
     const entries: Array<{ abortedAtEntry: boolean; abortedAfterUsage: boolean }> = [];
     runWithModelFallbackMock.mockImplementation(
-      async ({ run }: { run: (p: string, m: string) => Promise<unknown> }) => {
-        await run("anthropic", "model-a");
-        const second = await run("anthropic", "model-b");
+      async (params: {
+        provider: string;
+        model: string;
+        run: (p: string, m: string) => Promise<unknown>;
+        abortSignal?: AbortSignal;
+      }) => {
+        // The entry aborts the run mid-flight once the budget trips, so a later
+        // candidate must observe the aborted signal before it is dispatched.
+        params.abortSignal?.throwIfAborted();
+        const first = await runInitialModelFallbackAttempt(params as never, "anthropic", "model-a");
+        params.abortSignal?.throwIfAborted();
+        const second = await runInitialModelFallbackAttempt(
+          params as never,
+          "anthropic",
+          "model-b",
+        );
         return {
-          result: second,
+          result: { result: second ?? first },
           provider: "anthropic",
           model: "model-b",
           attempts: [],
@@ -127,21 +141,29 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
     const coordinatorSignals: Array<AbortSignal | undefined> = [];
     const candidateRuns: Array<{ abortedAtEntry: boolean }> = [];
     runWithModelFallbackMock.mockImplementation(
-      async ({
-        abortSignal,
-        run,
-      }: {
-        abortSignal?: AbortSignal;
+      async (params: {
+        provider: string;
+        model: string;
         run: (p: string, m: string) => Promise<unknown>;
+        abortSignal?: AbortSignal;
       }) => {
-        coordinatorSignals.push(abortSignal);
+        coordinatorSignals.push(params.abortSignal);
         // Mirror the shared coordinator admission guard: a later candidate
         // must not be prepared or executed once the supplied signal aborted.
-        abortSignal?.throwIfAborted();
-        const first = await run("anthropic", "model-a");
-        abortSignal?.throwIfAborted();
-        const second = await run("anthropic", "model-b");
-        return { result: second ?? first, provider: "anthropic", model: "model-b", attempts: [] };
+        params.abortSignal?.throwIfAborted();
+        const first = await runInitialModelFallbackAttempt(params as never, "anthropic", "model-a");
+        params.abortSignal?.throwIfAborted();
+        const second = await runInitialModelFallbackAttempt(
+          params as never,
+          "anthropic",
+          "model-b",
+        );
+        return {
+          result: { result: second ?? first },
+          provider: "anthropic",
+          model: "model-b",
+          attempts: [],
+        };
       },
     );
     runEmbeddedAgentMock.mockImplementation(
@@ -215,28 +237,36 @@ describe("runCronIsolatedAgentTurn — token budget carries across candidates", 
 
   it("retains a throwing candidate's observed usage against the next candidate's tripwire", async () => {
     // A candidate that reports spend and then throws a fallback-eligible
-    // error still consumed those tokens. Without retention (onError),
-    // candidate B starts fresh: its 150-token report would not trip a
-    // 200-token budget even though A+B = 300. The onError hook folds A's
-    // observed total into the carried spend before B runs, so B's report
-    // trips the shared guard.
+    // error still consumed those tokens. Without retention (the fallback-step
+    // hook), candidate B starts fresh: its 150-token report would not trip a
+    // 200-token budget even though A+B = 300. The hook folds A's observed
+    // total into the carried spend before B runs, so B's report trips the
+    // shared guard.
     const candidateSignals: Array<{ candidate: string; abortedAfterUsage: boolean }> = [];
     runWithModelFallbackMock.mockImplementation(
-      async ({
-        run,
-        onError,
-      }: {
+      async (params: {
+        provider: string;
+        model: string;
         run: (p: string, m: string) => Promise<unknown>;
-        onError?: () => void;
+        onFallbackStep?: () => void;
       }) => {
         try {
-          await run("anthropic", "model-a");
+          await runInitialModelFallbackAttempt(params as never, "anthropic", "model-a");
         } catch {
           // Mirror the real coordinator: the throwing candidate's observed
           // usage is retained before the next candidate is prepared.
-          onError?.();
-          const second = await run("anthropic", "model-b");
-          return { result: second, provider: "anthropic", model: "model-b", attempts: [] };
+          params.onFallbackStep?.();
+          const second = await runInitialModelFallbackAttempt(
+            params as never,
+            "anthropic",
+            "model-b",
+          );
+          return {
+            result: { result: second },
+            provider: "anthropic",
+            model: "model-b",
+            attempts: [],
+          };
         }
         return { result: null, provider: "anthropic", model: "model-a", attempts: [] };
       },

@@ -346,7 +346,16 @@ export async function runCronIsolatedAgentTurn(
                 ? { kind: "reason", reason: errorReason }
                 : undefined,
               executionStarted,
-              usage,
+              // A typed budget trip carries the producer-recorded usage total; no
+              // prompt run completed, so `usage` above is undefined. Surface the
+              // total here so the service layer can classify `budget-exhausted`
+              // (detectBudgetExhausted) and the finished event/history keep the
+              // observed spend instead of a usage-less generic failure.
+              usage:
+                usage ??
+                (isCronTokenBudgetExhaustedError(err)
+                  ? { total_tokens: err.usageTotal }
+                  : undefined),
               ...(admissionDisposition ? { admissionDisposition } : {}),
               // Carry the already-resolved run model into the error/timeout row so
               // Task-run history keeps provider/model attribution instead of looking like

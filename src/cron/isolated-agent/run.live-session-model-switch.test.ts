@@ -470,18 +470,21 @@ describe("runCronIsolatedAgentTurn — LiveSessionModelSwitchError retry (#57206
     });
     const candidateSignals: Array<{ candidate: string; abortedAfterUsage: boolean }> = [];
     let callCount = 0;
-    runWithModelFallbackMock.mockImplementation(
-      async ({ run }: { run: (p: string, m: string) => Promise<unknown> }) => {
-        callCount++;
-        if (callCount === 1) {
-          // First attempt: candidate A reports usage then triggers a model switch.
-          const result = await run("anthropic", "claude-opus-4-6");
-          return result;
-        }
-        const result = await run("anthropic", "claude-sonnet-4-6");
-        return { result, provider: "anthropic", model: "claude-sonnet-4-6", attempts: [] };
-      },
-    );
+    runWithModelFallbackMock.mockImplementation(async (params: TestModelFallbackRunnerParams) => {
+      callCount++;
+      if (callCount === 1) {
+        // First attempt: candidate A reports usage then triggers a model switch.
+        const result = await runInitialModelFallbackAttempt(params, "anthropic", "claude-opus-4-6");
+        return { result, provider: "anthropic", model: "claude-opus-4-6", attempts: [] };
+      }
+      const result = await runInitialModelFallbackAttempt(params, "anthropic", "claude-sonnet-4-6");
+      return {
+        result: { result },
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+        attempts: [],
+      };
+    });
     runEmbeddedAgentMock.mockImplementation(
       async (call: {
         abortSignal?: AbortSignal;
@@ -508,18 +511,18 @@ describe("runCronIsolatedAgentTurn — LiveSessionModelSwitchError retry (#57206
 
     const result = await runCronIsolatedAgentTurn({
       ...makeParams(),
-      job: {
-        ...makeJob(),
+      job: makeJob({
         payload: { kind: "agentTurn", message: "run task", tokenBudget: 200 },
-      },
+      }),
     });
 
     expect(candidateSignals).toHaveLength(2);
     // First candidate reported 150 (no trip yet) then switched.
     expect(candidateSignals[0]).toEqual({ candidate: "opus", abortedAfterUsage: false });
     // Second candidate inherited the 150 carry; its 150 report trips 150+150=300.
-    expect(candidateSignals[1].candidate).toBe("sonnet");
-    expect(candidateSignals[1].abortedAfterUsage).toBe(true);
+    const secondCandidate = candidateSignals[1];
+    expect(secondCandidate?.candidate).toBe("sonnet");
+    expect(secondCandidate?.abortedAfterUsage).toBe(true);
     expect(result.status).toBe("error");
     expect(result.error).toContain("Token budget exhausted");
   });
